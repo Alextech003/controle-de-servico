@@ -1,8 +1,10 @@
+
 import React, { useState, useMemo } from 'react';
 import { 
   Plus, Search, FileText, Trash2, Edit, X, Save, 
-  MessageSquare, ClipboardList, Table as TableIcon,
-  ChevronLeft, ChevronRight, Users as UsersIcon, ArrowRight, CopyPlus
+  MessageSquare, Table as TableIcon,
+  ArrowRight, CopyPlus, Loader2,
+  Users as UsersIcon, Check, XCircle
 } from 'lucide-react';
 import { 
   Service, ServiceStatus, ServiceType, Company, 
@@ -11,24 +13,29 @@ import {
 
 interface ServicesProps {
   services: Service[];
-  allServices: Service[];
   currentUser: User;
   users: User[];
-  onUpdateServices: (services: Service[]) => void;
+  onSaveService: (service: Service) => Promise<void>;
+  onDeleteService: (id: string) => Promise<void>;
   viewingTechnicianId: string | null;
   onClearFilter: () => void;
   onFilterByTech: (id: string) => void;
 }
 
 const Services: React.FC<ServicesProps> = ({ 
-  services, allServices, currentUser, users, onUpdateServices, 
+  services, currentUser, users, onSaveService, onDeleteService, 
   viewingTechnicianId, onClearFilter, onFilterByTech
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [viewingReason, setViewingReason] = useState<Service | null>(null);
+  
+  // Estado para controlar qual item está sendo deletado (confirmação visual)
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'realized' | 'cancelled'>('realized');
+  const [isSaving, setIsSaving] = useState(false);
   
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
@@ -38,7 +45,7 @@ const Services: React.FC<ServicesProps> = ({
   const initialFormState: Partial<Service> = {
     date: new Date().toISOString().split('T')[0],
     status: ServiceStatus.REALIZADO,
-    value: 50.00,
+    value: 0.00,
     type: ServiceType.INSTALACAO,
     company: Company.AIROCLUBE,
     customerName: '',
@@ -77,34 +84,51 @@ const Services: React.FC<ServicesProps> = ({
     link.click();
   };
 
-  const handleSave = (keepOpen: boolean = false) => {
+  const handleSave = async (keepOpen: boolean = false) => {
     if (!formData.customerName || !formData.date || !formData.plate) {
       alert("Por favor, preencha o Nome do Cliente, Data e Placa."); 
       return;
     }
 
-    let updatedList: Service[];
-    if (editingService) {
-      updatedList = allServices.map(s => s.id === editingService.id ? { ...s, ...formData } as Service : s);
-    } else {
-      const newService: Service = { 
-        ...formData, 
-        id: Math.random().toString(36).substr(2, 9), 
-        technicianId: currentUser.id, 
-        technicianName: currentUser.name 
-      } as Service;
-      updatedList = [newService, ...allServices];
-    }
-    
-    onUpdateServices(updatedList);
+    setIsSaving(true);
+
+    const serviceToSave: Service = {
+        ...initialFormState,
+        ...formData,
+        id: editingService ? editingService.id : Math.random().toString(36).substr(2, 9),
+        technicianId: editingService ? editingService.technicianId : currentUser.id,
+        technicianName: editingService ? editingService.technicianName : currentUser.name
+    } as Service;
+
+    await onSaveService(serviceToSave);
+    setIsSaving(false);
     
     if (keepOpen) { 
-      setFormData({ ...initialFormState, date: formData.date }); 
+      setFormData({ ...initialFormState, date: formData.date, value: 0.00 }); 
       setEditingService(null); 
     } else { 
       setShowForm(false); 
       setEditingService(null); 
     }
+  };
+
+  // Função simples para iniciar a exclusão
+  const initiateDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setConfirmingDeleteId(id);
+  };
+
+  // Função para confirmar a exclusão
+  const confirmDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await onDeleteService(id);
+    setConfirmingDeleteId(null);
+  };
+
+  // Função para cancelar a exclusão
+  const cancelDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmingDeleteId(null);
   };
 
   const isAdmin = currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN;
@@ -200,10 +224,45 @@ const Services: React.FC<ServicesProps> = ({
                       <td className="px-6 py-4 print:hidden">
                         <div className="flex items-center justify-center space-x-2">
                           {s.status === ServiceStatus.CANCELADO && <button onClick={() => setViewingReason(s)} className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"><MessageSquare size={18} /></button>}
+                          
+                          {/* Lógica de Edição e Exclusão Segura */}
                           {canEdit && (
                             <>
-                              <button onClick={() => {setEditingService(s); setFormData(s); setShowForm(true);}} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><Edit size={18} /></button>
-                              <button onClick={() => onUpdateServices(allServices.filter(x => x.id !== s.id))} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><Trash2 size={18} /></button>
+                              {confirmingDeleteId === s.id ? (
+                                <div className="flex items-center bg-rose-50 rounded-xl p-1 animate-in zoom-in duration-200">
+                                   <button 
+                                      onClick={(e) => confirmDelete(e, s.id)}
+                                      className="p-1.5 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors mr-1"
+                                      title="Confirmar Exclusão"
+                                   >
+                                      <Check size={16} strokeWidth={3} />
+                                   </button>
+                                   <button 
+                                      onClick={cancelDelete}
+                                      className="p-1.5 text-slate-500 hover:bg-slate-200 rounded-lg transition-colors"
+                                      title="Cancelar"
+                                   >
+                                      <XCircle size={16} />
+                                   </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button 
+                                    type="button"
+                                    onClick={() => {setEditingService(s); setFormData(s); setShowForm(true);}} 
+                                    className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                  >
+                                    <Edit size={18} />
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    onClick={(e) => initiateDelete(e, s.id)}
+                                    className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </>
+                              )}
                             </>
                           )}
                         </div>
@@ -232,7 +291,7 @@ const Services: React.FC<ServicesProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Data *</label>
-                  <input type="date" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-[#00AEEF] text-slate-900 font-black" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} />
+                  <input type="date" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-[#00AEEF] text-slate-900 font-black [color-scheme:light]" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Bairro / Região</label>
@@ -288,16 +347,16 @@ const Services: React.FC<ServicesProps> = ({
               )}
 
               <div className="flex flex-col md:flex-row justify-end space-y-4 md:space-y-0 md:space-x-4 pt-10 border-t border-slate-100">
-                <button onClick={() => setShowForm(false)} className="px-8 py-4 text-slate-400 font-black uppercase text-xs tracking-widest hover:text-slate-600">Descartar</button>
+                <button onClick={() => setShowForm(false)} disabled={isSaving} className="px-8 py-4 text-slate-400 font-black uppercase text-xs tracking-widest hover:text-slate-600">Descartar</button>
                 {!editingService && (
-                  <button onClick={() => handleSave(true)} className="px-8 py-4 bg-white border-2 border-[#0A192F] text-[#0A192F] font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center space-x-2">
-                    <CopyPlus size={20} className="text-[#00AEEF]" />
-                    <span>Salvar e Próximo</span>
+                  <button onClick={() => handleSave(true)} disabled={isSaving} className="px-8 py-4 bg-white border-2 border-[#0A192F] text-[#0A192F] font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center space-x-2">
+                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : <CopyPlus size={20} className="text-[#00AEEF]" />}
+                    <span>{isSaving ? 'Salvando...' : 'Salvar e Próximo'}</span>
                   </button>
                 )}
-                <button onClick={() => handleSave(false)} className="px-12 py-4 bg-[#0A192F] text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl shadow-blue-900/10 hover:bg-slate-800 transition-all flex items-center justify-center space-x-2">
-                  <Save size={20} className="text-[#00AEEF]" />
-                  <span>{editingService ? 'Salvar Alterações' : 'Concluir Registro'}</span>
+                <button onClick={() => handleSave(false)} disabled={isSaving} className="px-12 py-4 bg-[#0A192F] text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl shadow-blue-900/10 hover:bg-slate-800 transition-all flex items-center justify-center space-x-2">
+                  {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} className="text-[#00AEEF]" />}
+                  <span>{isSaving ? 'Salvando...' : (editingService ? 'Salvar Alterações' : 'Concluir Registro')}</span>
                 </button>
               </div>
             </div>

@@ -6,7 +6,7 @@ import Logo from './Logo';
 
 interface ProfileProps {
   user: User;
-  onUpdateUser: (userData: Partial<User>) => void;
+  onUpdateUser: (userData: User) => Promise<void>;
 }
 
 const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
@@ -29,8 +29,13 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
     }
   };
 
-  const handleSave = () => {
-      onUpdateUser(formData);
+  const handleSave = async () => {
+      const updatedUser = { ...user, ...formData };
+      if (!formData.password) {
+        // Se a senha estiver vazia, restaura a original (para não sobrescrever com string vazia)
+        updatedUser.password = user.password;
+      }
+      await onUpdateUser(updatedUser);
       alert("Perfil atualizado com sucesso!");
   };
 

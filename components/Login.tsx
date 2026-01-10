@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
-import { Lock, User as UserIcon, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
+import { AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 import Logo from './Logo';
 
 interface LoginProps {
@@ -20,136 +20,134 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     setError(null);
     setIsLoading(true);
 
+    // Simulação de delay para feedback visual
     setTimeout(() => {
-      const user = users.find(u => 
-        (u.name.toLowerCase() === login.toLowerCase() || u.phone === login) && 
-        u.password === password
-      );
+      const cleanLogin = login.trim().toLowerCase();
+      const cleanPassword = password.trim();
+
+      const user = users.find(u => {
+        const uName = u.name.toLowerCase().trim();
+        const uPhone = u.phone.trim();
+        return (uName === cleanLogin || uPhone === cleanLogin) && u.password === cleanPassword;
+      });
 
       if (user) {
         if (!user.isActive) {
-          setError('Sua conta está suspensa. Entre em contato com a administração.');
+          setError('Acesso suspenso. Contate o administrador.');
           setIsLoading(false);
           return;
         }
         onLogin(user);
       } else {
-        setError('Acesso negado. Verifique suas credenciais.');
+        setError('Credenciais inválidas. Verifique seus dados.');
         setIsLoading(false);
       }
     }, 800);
   };
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden">
-      {/* Lado Esquerdo - Branding Azul */}
-      <div className="hidden lg:flex lg:w-3/5 bg-[#0A192F] items-center justify-center p-12 relative overflow-hidden">
-        {/* Background Decorative */}
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#00AEEF]/10 rounded-full blur-[120px] -mr-64 -mt-64"></div>
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-white/5 rounded-full blur-[100px] -ml-64 -mb-64"></div>
-        
-        <div className="relative z-10 text-center space-y-12 animate-in fade-in zoom-in duration-1000">
-          <div className="flex flex-col items-center">
-            <div className="p-6 rounded-[3rem] bg-white shadow-2xl shadow-blue-900/40 mb-8 transform hover:scale-105 transition-transform duration-500">
-               <Logo size={140} />
-            </div>
-            <h1 className="text-6xl font-black text-white tracking-tighter uppercase">
-                AIRO-<span className="text-[#00AEEF]">TECH</span>
-            </h1>
-            <div className="h-1.5 w-24 bg-[#00AEEF] mt-4 rounded-full"></div>
-            <p className="text-slate-400 mt-8 max-w-md text-xl font-medium leading-relaxed">
-                Gestão inteligente e monitoramento em tempo real para frotas e serviços técnicos.
-            </p>
+    <div className="min-h-screen w-full flex font-sans bg-white overflow-hidden">
+      
+      {/* LADO ESQUERDO - BRANDING (Escuro) */}
+      <div className="hidden lg:flex w-1/2 bg-[#0A192F] relative flex-col items-center justify-center p-12 overflow-hidden">
+        {/* Efeitos de Fundo */}
+        <div className="absolute top-[-20%] right-[-20%] w-[600px] h-[600px] bg-[#00AEEF]/10 rounded-full blur-[120px] pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-white/5 rounded-full blur-[80px] pointer-events-none"></div>
+
+        <div className="relative z-10 flex flex-col items-center text-center max-w-lg">
+          <div className="bg-white rounded-[2.5rem] w-48 h-48 flex items-center justify-center shadow-2xl mb-10 animate-in zoom-in duration-700">
+             <Logo size={120} />
           </div>
           
-          <div className="grid grid-cols-3 gap-8 pt-10">
-            <div className="text-center p-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
-                <p className="text-3xl font-black text-white">100%</p>
-                <p className="text-[10px] text-[#00AEEF] uppercase tracking-[0.2em] font-black mt-1">Operacional</p>
-            </div>
-            <div className="text-center p-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
-                <p className="text-3xl font-black text-white">Cloud</p>
-                <p className="text-[10px] text-[#00AEEF] uppercase tracking-[0.2em] font-black mt-1">Sincronizado</p>
-            </div>
-            <div className="text-center p-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
-                <p className="text-3xl font-black text-white">BI</p>
-                <p className="text-[10px] text-[#00AEEF] uppercase tracking-[0.2em] font-black mt-1">Inteligência</p>
-            </div>
+          <h1 className="text-5xl font-black text-white uppercase tracking-tighter mb-4">
+            AIRO-<span className="text-[#00AEEF]">TECH</span>
+          </h1>
+          <div className="h-1.5 w-24 bg-[#00AEEF] rounded-full mb-8"></div>
+          
+          <p className="text-slate-300 text-lg font-medium leading-relaxed mb-16">
+            Gestão inteligente e monitoramento em tempo real para frotas e serviços técnicos.
+          </p>
+
+          <div className="grid grid-cols-3 gap-6 w-full">
+             <div className="bg-[#112240] border border-slate-700/50 p-6 rounded-3xl flex flex-col items-center justify-center group hover:bg-[#1A2F55] transition-colors">
+                <span className="text-3xl font-black text-white mb-1">100%</span>
+                <span className="text-[8px] font-black text-[#00AEEF] uppercase tracking-widest">Operacional</span>
+             </div>
+             <div className="bg-[#112240] border border-slate-700/50 p-6 rounded-3xl flex flex-col items-center justify-center group hover:bg-[#1A2F55] transition-colors">
+                <span className="text-xl font-black text-white mb-1 uppercase">Cloud</span>
+                <span className="text-[8px] font-black text-[#00AEEF] uppercase tracking-widest">Sincronizado</span>
+             </div>
+             <div className="bg-[#112240] border border-slate-700/50 p-6 rounded-3xl flex flex-col items-center justify-center group hover:bg-[#1A2F55] transition-colors">
+                <span className="text-3xl font-black text-white mb-1">BI</span>
+                <span className="text-[8px] font-black text-[#00AEEF] uppercase tracking-widest">Inteligência</span>
+             </div>
           </div>
         </div>
       </div>
 
-      {/* Lado Direito - Formulário */}
-      <div className="w-full lg:w-2/5 flex items-center justify-center p-8 lg:p-24 bg-white relative">
-        <div className="w-full max-sm space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-          <div className="text-center lg:text-left space-y-2">
-            <Logo size={56} className="lg:hidden mx-auto mb-6" />
-            <h2 className="text-4xl font-black text-[#0A192F] tracking-tight">Login</h2>
-            <p className="text-slate-500 font-medium">Bem-vindo à plataforma AIRO-TECH.</p>
+      {/* LADO DIREITO - FORMULÁRIO (Branco) */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24 bg-white relative">
+        <div className="max-w-md w-full animate-in fade-in slide-in-from-right-8 duration-700">
+          
+          <div className="mb-12">
+            <h2 className="text-4xl font-black text-[#0A192F] mb-3">Login</h2>
+            <p className="text-slate-500 font-medium text-lg">Bem-vindo à plataforma AIRO-TECH.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
             {error && (
-              <div className="p-5 bg-rose-50 border border-rose-100 rounded-2xl flex items-center space-x-3 text-rose-600 text-sm animate-in slide-in-from-top-2">
-                <AlertCircle size={20} className="shrink-0" />
-                <span className="font-bold">{error}</span>
+              <div className="p-4 bg-rose-50 border-l-4 border-rose-500 rounded-r-xl flex items-center gap-3 text-rose-700 animate-in shake">
+                <AlertCircle size={20} />
+                <span className="font-bold text-sm">{error}</span>
               </div>
             )}
 
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Usuário / ID</label>
-                <div className="relative group">
-                  <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#00AEEF] transition-colors" size={20} />
-                  <input 
-                    type="text" 
-                    required
-                    placeholder="Seu identificador"
-                    className="w-full pl-14 pr-6 py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:bg-white focus:border-[#0A192F] transition-all text-slate-900 font-black placeholder:text-slate-300"
-                    value={login}
-                    onChange={(e) => setLogin(e.target.value)}
-                  />
-                </div>
-              </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1">Usuário / ID</label>
+              <input 
+                type="text" 
+                required
+                placeholder="Seu identificador"
+                className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:bg-white focus:border-[#0A192F] transition-all font-bold text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+              />
+            </div>
 
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Senha Segura</label>
-                <div className="relative group">
-                  <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#00AEEF] transition-colors" size={20} />
-                  <input 
-                    type="password" 
-                    required
-                    placeholder="••••••••"
-                    className="w-full pl-14 pr-6 py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:bg-white focus:border-[#0A192F] transition-all text-slate-900 font-black placeholder:text-slate-300"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-              </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1">Senha Segura</label>
+              <input 
+                type="password" 
+                required
+                placeholder="••••••••"
+                className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:bg-white focus:border-[#0A192F] transition-all font-bold text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
             </div>
 
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full py-5 bg-[#0A192F] hover:bg-[#162942] text-white font-black rounded-2xl shadow-2xl shadow-blue-100 transition-all flex items-center justify-center space-x-3 active:scale-[0.98] disabled:opacity-70 group"
+              className="w-full py-5 bg-[#0A192F] hover:bg-[#162942] text-white rounded-2xl shadow-xl shadow-[#0A192F]/20 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-70 group"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="animate-spin" size={20} />
-                  <span className="uppercase tracking-widest text-xs">Acessando...</span>
+                  <span className="font-black uppercase tracking-widest text-xs">Autenticando...</span>
                 </>
               ) : (
                 <>
-                  <span className="uppercase tracking-widest text-xs">Entrar no Sistema</span>
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform text-[#00AEEF]" />
+                  <span className="font-black uppercase tracking-widest text-xs">Entrar no Sistema</span>
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
           </form>
 
-          <div className="pt-10 text-center border-t border-slate-100">
-            <p className="text-[10px] text-slate-300 font-black uppercase tracking-[0.2em]">
-              &copy; 2024 AIRO-TECH | MONITORAMENTO 24H
+          <div className="mt-16 text-center lg:text-left border-t border-slate-100 pt-8">
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
+              © 2024 AIRO-TECH | Monitoramento 24h
             </p>
           </div>
         </div>

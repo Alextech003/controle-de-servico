@@ -2,11 +2,17 @@
 import { User, UserRole, Service, ServiceStatus, ServiceType, Company, CancelledBy } from './types';
 
 export const MOCK_USERS: User[] = [
+  // Usuários Administrativos
   { id: 'master_main', name: 'ADM', phone: '00000000000', role: UserRole.MASTER, isActive: true, password: '29031992' },
   { id: '1', name: 'Alex Master', phone: '21999999999', role: UserRole.MASTER, isActive: true, password: '123' },
   { id: '2', name: 'Mariana Admin', phone: '21988888888', role: UserRole.ADMIN, isActive: true, password: '123' },
+  
+  // Usuários Técnicos (Padrão para acesso multi-dispositivo)
   { id: '3', name: 'José Técnico', phone: '21977777777', role: UserRole.TECHNICIAN, isActive: true, password: '123' },
   { id: '4', name: 'Lucas Silva', phone: '21966666666', role: UserRole.TECHNICIAN, isActive: true, password: '123' },
+  { id: '5', name: 'Técnico 1', phone: 'tecnico1', role: UserRole.TECHNICIAN, isActive: true, password: '123' },
+  { id: '6', name: 'Técnico 2', phone: 'tecnico2', role: UserRole.TECHNICIAN, isActive: true, password: '123' },
+  { id: '7', name: 'Técnico 3', phone: 'tecnico3', role: UserRole.TECHNICIAN, isActive: true, password: '123' },
 ];
 
 export const MOCK_SERVICES: Service[] = [

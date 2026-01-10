@@ -1,14 +1,15 @@
 
 import React, { useState, useRef } from 'react';
 import { User, UserRole } from '../types';
-import { UserPlus, Phone, Lock, User as UserIcon, Trash2, Edit, X, Save, Camera, AlertTriangle, UserMinus, UserCheck, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { UserPlus, Phone, Lock, User as UserIcon, Trash2, Edit, X, Save, Camera, UserMinus, UserCheck, Eye, EyeOff } from 'lucide-react';
 
 interface UsersProps {
   users: User[];
-  onUpdateUsers: (users: User[]) => void;
+  onSaveUser: (user: User) => Promise<void>;
+  onDeleteUser: (id: string) => Promise<void>;
 }
 
-const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
+const Users: React.FC<UsersProps> = ({ users, onSaveUser, onDeleteUser }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -35,43 +36,33 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.phone || (!editingUser && !formData.password)) {
       alert("Preencha todos os campos obrigatórios (Nome, Telefone e Senha).");
       return;
     }
 
-    let updatedList: User[];
-
-    if (editingUser) {
-      updatedList = users.map(u => u.id === editingUser.id ? { ...u, ...formData } as User : u);
-    } else {
-      const newUser: User = {
+    const newUser: User = {
         ...formData,
-        id: Math.random().toString(36).substr(2, 9),
-      } as User;
-      updatedList = [...users, newUser];
-    }
-    
-    onUpdateUsers(updatedList);
+        id: editingUser ? editingUser.id : Math.random().toString(36).substr(2, 9),
+    } as User;
+
+    await onSaveUser(newUser);
     setShowForm(false);
     setEditingUser(null);
     setFormData({ role: UserRole.TECHNICIAN, isActive: true });
   };
 
-  const handleToggleStatus = (user: User) => {
+  const handleToggleStatus = async (user: User) => {
     // Proteção de sistema para usuários mestres invisíveis
     if (user.id === '1' || user.name === 'Alex Master' || user.id === 'master_main') {
        alert("Este usuário é vitalício e não pode ser alterado por aqui.");
        return;
     }
-    const updatedList = users.map(u => 
-      u.id === user.id ? { ...u, isActive: !u.isActive } : u
-    );
-    onUpdateUsers(updatedList);
+    await onSaveUser({ ...user, isActive: !user.isActive });
   };
 
-  const executeDelete = () => {
+  const executeDelete = async () => {
     if (confirmDeleteId) {
       const userToDelete = users.find(u => u.id === confirmDeleteId);
       if (userToDelete?.id === '1' || userToDelete?.name === 'Alex Master' || userToDelete?.id === 'master_main') {
@@ -79,13 +70,15 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
          setConfirmDeleteId(null);
          return;
       }
-      onUpdateUsers(users.filter(u => u.id !== confirmDeleteId));
+      await onDeleteUser(confirmDeleteId);
       setConfirmDeleteId(null);
     }
   };
 
   // Filtramos os usuários master que devem ser invisíveis na aba de usuários
   const visibleUsers = users.filter(u => u.id !== '1' && u.name !== 'Alex Master' && u.id !== 'master_main');
+
+  const UsersIcon = UserIcon; // Alias para evitar conflito
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -138,7 +131,7 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
                     {user.avatar ? (
                       <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                     ) : (
-                      <UserIcon size={48} className="text-slate-300" />
+                      <UsersIcon size={48} className="text-slate-300" />
                     )}
                   </div>
                   <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-4 border-white shadow-sm ${user.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
