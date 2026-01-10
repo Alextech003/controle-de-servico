@@ -99,9 +99,19 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
             </button>
           )}
           <div className="flex items-center space-x-3 bg-white p-2 rounded-2xl border border-slate-200">
-            <button onClick={() => { let nm = selectedMonth - 1; if(nm < 0) { nm=11; setSelectedYear(selectedYear-1); } setSelectedMonth(nm); }} className="p-2 hover:bg-slate-100 rounded-xl"><ChevronLeft size={20}/></button>
+            <button 
+              onClick={() => { let nm = selectedMonth - 1; if(nm < 0) { nm=11; setSelectedYear(selectedYear-1); } setSelectedMonth(nm); }} 
+              className="p-2 hover:bg-slate-100 rounded-xl transition-colors group"
+            >
+              <ChevronLeft size={24} className="text-[#00AEEF] group-active:scale-90 transition-transform" />
+            </button>
             <div className="px-4 text-center min-w-[140px] font-black uppercase text-sm text-slate-800">{months[selectedMonth]} {selectedYear}</div>
-            <button onClick={() => { let nm = selectedMonth + 1; if(nm > 11) { nm=0; setSelectedYear(selectedYear+1); } setSelectedMonth(nm); }} className="p-2 hover:bg-slate-100 rounded-xl"><ChevronRight size={20}/></button>
+            <button 
+              onClick={() => { let nm = selectedMonth + 1; if(nm > 11) { nm=0; setSelectedYear(selectedYear+1); } setSelectedMonth(nm); }} 
+              className="p-2 hover:bg-slate-100 rounded-xl transition-colors group"
+            >
+              <ChevronRight size={24} className="text-[#00AEEF] group-active:scale-90 transition-transform" />
+            </button>
           </div>
         </div>
       </div>

