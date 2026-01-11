@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { User } from '../types';
 import { Shield, Phone, Save, Lock, Camera } from 'lucide-react';
@@ -40,24 +39,24 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500">
       <div className="flex items-center space-x-4">
           <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
             <Logo size={40} />
           </div>
           <div>
-              <h1 className="text-3xl font-black text-[#0A192F] tracking-tight">Meu Perfil</h1>
+              <h1 className="text-2xl md:text-3xl font-black text-[#0A192F] tracking-tight">Meu Perfil</h1>
               <p className="text-slate-500 font-medium">Configurações da sua conta AIRO-TECH</p>
           </div>
       </div>
 
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-10 bg-[#0A192F] text-white relative overflow-hidden">
+        <div className="p-6 md:p-10 bg-[#0A192F] text-white relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#00AEEF]/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
             
             <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-8 relative z-10">
                 <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                    <div className="w-32 h-32 bg-white/10 rounded-[2.5rem] flex items-center justify-center backdrop-blur-md border border-white/20 overflow-hidden shadow-2xl transition-all group-hover:scale-105">
+                    <div className="w-24 h-24 md:w-32 md:h-32 bg-white/10 rounded-[2.5rem] flex items-center justify-center backdrop-blur-md border border-white/20 overflow-hidden shadow-2xl transition-all group-hover:scale-105">
                         {formData.avatar ? (
                             <img src={formData.avatar} alt={user.name} className="w-full h-full object-cover" />
                         ) : (
@@ -71,7 +70,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                 </div>
                 
                 <div className="text-center md:text-left">
-                    <h2 className="text-3xl font-black tracking-tight uppercase">{user.name}</h2>
+                    <h2 className="text-2xl md:text-3xl font-black tracking-tight uppercase">{user.name}</h2>
                     <div className="flex items-center justify-center md:justify-start space-x-2 mt-2">
                         <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-[#00AEEF] text-white shadow-lg`}>
                             {user.role}
@@ -85,8 +84,8 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
             </div>
         </div>
 
-        <div className="p-10 space-y-10">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="p-6 md:p-10 space-y-8 md:space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                 <div>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Nome de Exibição</label>
                     <input 
@@ -131,7 +130,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
             <div className="pt-10 flex justify-end">
                 <button 
                     onClick={handleSave}
-                    className="px-12 py-5 bg-[#0A192F] text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl shadow-slate-200 hover:bg-[#162942] transition-all flex items-center space-x-3 active:scale-95"
+                    className="w-full md:w-auto px-12 py-5 bg-[#0A192F] text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl shadow-slate-200 hover:bg-[#162942] transition-all flex items-center justify-center md:justify-start space-x-3 active:scale-95"
                 >
                     <Save size={20} />
                     <span>Salvar Alterações</span>
@@ -140,7 +139,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
         </div>
       </div>
       
-      <div className="bg-[#0A192F] p-10 rounded-[2.5rem] border border-slate-800 flex items-start space-x-6 text-white relative overflow-hidden shadow-2xl shadow-blue-900/10">
+      <div className="bg-[#0A192F] p-6 md:p-10 rounded-[2.5rem] border border-slate-800 flex flex-col md:flex-row items-start space-y-4 md:space-y-0 md:space-x-6 text-white relative overflow-hidden shadow-2xl shadow-blue-900/10">
           <div className="absolute top-0 right-0 p-10 opacity-10">
              <Logo size={180} />
           </div>

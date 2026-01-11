@@ -80,10 +80,10 @@ const Users: React.FC<UsersProps> = ({ users, onSaveUser, onDeleteUser }) => {
   const UsersIcon = UserIcon; // Alias para evitar conflito
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gestão de Usuários</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Gestão de Usuários</h1>
           <p className="text-slate-500 font-medium">Controle total de acessos e senhas da equipe</p>
         </div>
         <button 
@@ -95,7 +95,7 @@ const Users: React.FC<UsersProps> = ({ users, onSaveUser, onDeleteUser }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
         {visibleUsers.map((user) => {
           return (
             <div key={user.id} className={`bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col group hover:shadow-2xl hover:shadow-slate-200/50 hover:border-blue-100 transition-all duration-300 ${!user.isActive ? 'opacity-60 grayscale' : ''}`}>

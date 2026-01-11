@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User } from '../types';
 import { AlertCircle, Loader2, ArrowRight } from 'lucide-react';
@@ -59,13 +58,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
              <Logo size={120} />
           </div>
           
-          <h1 className="text-5xl font-black text-white uppercase tracking-tighter mb-4">
-            AIRO-<span className="text-[#00AEEF]">TECH</span>
+          <h1 className="text-5xl font-black text-white uppercase tracking-tighter mb-2 leading-none">
+            AIRO<span className="text-red-600">TRACKER</span>
           </h1>
-          <div className="h-1.5 w-24 bg-[#00AEEF] rounded-full mb-8"></div>
+          <div className="flex items-center justify-center mb-8 gap-2">
+             <span className="text-red-600 text-4xl font-black">+</span>
+             <span className="text-white text-3xl font-black uppercase">Técnicos</span>
+          </div>
           
-          <p className="text-slate-300 text-lg font-medium leading-relaxed mb-16">
-            Gestão inteligente e monitoramento em tempo real para frotas e serviços técnicos.
+          <p className="text-slate-400 text-sm font-black uppercase tracking-[0.3em] mb-16">
+            Monitoramento 24H
           </p>
 
           <div className="grid grid-cols-3 gap-6 w-full">
@@ -91,7 +93,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           
           <div className="mb-12">
             <h2 className="text-4xl font-black text-[#0A192F] mb-3">Login</h2>
-            <p className="text-slate-500 font-medium text-lg">Bem-vindo à plataforma AIRO-TECH.</p>
+            <p className="text-slate-500 font-medium text-lg">Bem-vindo à plataforma AIROTRACKER.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
@@ -147,7 +149,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
           <div className="mt-16 text-center lg:text-left border-t border-slate-100 pt-8">
             <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
-              © 2024 AIRO-TECH | Monitoramento 24h
+              © 2024 AIROTRACKER | Monitoramento 24h
             </p>
           </div>
         </div>

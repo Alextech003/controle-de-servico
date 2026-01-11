@@ -3,7 +3,7 @@ import {
   Plus, Search, FileText, Trash2, Edit, X, Save, 
   MessageSquare, Table as TableIcon,
   ArrowRight, CopyPlus, Loader2,
-  Users as UsersIcon, Check, XCircle
+  Users as UsersIcon, Check, XCircle, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { 
   Service, ServiceStatus, ServiceType, Company, 
@@ -40,6 +40,29 @@ const Services: React.FC<ServicesProps> = ({
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+  // Funções de navegação do mês
+  const handlePrevMonth = () => {
+    setSelectedMonth((prev) => {
+      const newMonth = prev - 1;
+      if (newMonth < 0) {
+        setSelectedYear((y) => y - 1);
+        return 11;
+      }
+      return newMonth;
+    });
+  };
+
+  const handleNextMonth = () => {
+    setSelectedMonth((prev) => {
+      const newMonth = prev + 1;
+      if (newMonth > 11) {
+        setSelectedYear((y) => y + 1);
+        return 0;
+      }
+      return newMonth;
+    });
+  };
 
   const initialFormState: Partial<Service> = {
     date: new Date().toISOString().split('T')[0],
@@ -136,7 +159,7 @@ const Services: React.FC<ServicesProps> = ({
   return (
     <div className="flex h-full animate-in fade-in duration-500 overflow-hidden">
       {isAdmin && (
-        <aside className="w-80 bg-white border-r border-slate-100 p-8 flex flex-col space-y-6 overflow-y-auto print:hidden">
+        <aside className="hidden lg:flex w-80 bg-white border-r border-slate-100 p-8 flex-col space-y-6 overflow-y-auto print:hidden">
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center">
             <UsersIcon className="mr-2 text-[#00AEEF]" /> Equipe Ativa
           </h2>
@@ -154,24 +177,43 @@ const Services: React.FC<ServicesProps> = ({
         </aside>
       )}
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-8 print:p-0 bg-slate-50/30">
-        <div className="flex justify-between items-center print:hidden">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8 print:p-0 bg-slate-50/30">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 print:hidden">
           <div>
-            <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">Serviços</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-800 uppercase tracking-tight">Serviços</h1>
             <p className="text-slate-500 font-medium">Relatório Detalhado</p>
           </div>
-          <div className="flex space-x-3">
-            <button onClick={() => window.print()} className="flex items-center space-x-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-black uppercase hover:bg-slate-50 transition-all">
-              <FileText size={18} className="text-[#00AEEF]" /> <span>PDF</span>
-            </button>
-            <button onClick={handleExportExcel} className="flex items-center space-x-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-black uppercase hover:bg-slate-50 transition-all">
-              <TableIcon size={18} className="text-emerald-500" /> <span>Excel</span>
-            </button>
-            {canEdit && (
-              <button onClick={() => { setEditingService(null); setFormData(initialFormState); setShowForm(true); }} className="px-8 py-3 bg-[#0A192F] text-white rounded-xl text-sm font-black uppercase shadow-xl shadow-blue-900/10 active:scale-95 transition-all">
-                <Plus size={20} className="inline mr-1 text-[#00AEEF]" /> Novo Serviço
-              </button>
-            )}
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+             {/* Seletor de Mês adicionado à tela de serviços */}
+             <div className="flex items-center justify-between space-x-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                <button 
+                  onClick={handlePrevMonth} 
+                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors group"
+                >
+                  <ChevronLeft size={20} className="text-[#00AEEF] group-active:scale-90 transition-transform" />
+                </button>
+                <div className="px-3 text-center min-w-[120px] font-black uppercase text-xs text-slate-800">{months[selectedMonth]} {selectedYear}</div>
+                <button 
+                  onClick={handleNextMonth} 
+                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors group"
+                >
+                  <ChevronRight size={20} className="text-[#00AEEF] group-active:scale-90 transition-transform" />
+                </button>
+             </div>
+
+             <div className="flex gap-2">
+                <button onClick={() => window.print()} className="flex items-center space-x-2 px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-black uppercase hover:bg-slate-50 transition-all">
+                  <FileText size={18} className="text-[#00AEEF]" /> <span className="hidden lg:inline">PDF</span>
+                </button>
+                <button onClick={handleExportExcel} className="flex items-center space-x-2 px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-black uppercase hover:bg-slate-50 transition-all">
+                  <TableIcon size={18} className="text-emerald-500" /> <span className="hidden lg:inline">Excel</span>
+                </button>
+                {canEdit && (
+                  <button onClick={() => { setEditingService(null); setFormData(initialFormState); setShowForm(true); }} className="px-6 py-3 bg-[#0A192F] text-white rounded-xl text-sm font-black uppercase shadow-xl shadow-blue-900/10 active:scale-95 transition-all">
+                    <Plus size={20} className="inline mr-1 text-[#00AEEF]" /> <span className="hidden lg:inline">Novo Serviço</span>
+                  </button>
+                )}
+             </div>
           </div>
         </div>
 
@@ -191,36 +233,36 @@ const Services: React.FC<ServicesProps> = ({
             <table className="w-full text-left">
               <thead className="bg-slate-50/80 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-5">Data</th>
-                  <th className="px-6 py-5">Cliente</th>
-                  <th className="px-6 py-5">Bairro</th>
-                  <th className="px-6 py-5">Empresa</th>
-                  <th className="px-6 py-5 text-center">Placa</th>
-                  <th className="px-6 py-5">Valor</th>
-                  <th className="px-6 py-5 print:hidden text-center">Ações</th>
+                  <th className="px-6 py-5 whitespace-nowrap">Data</th>
+                  <th className="px-6 py-5 whitespace-nowrap">Cliente</th>
+                  <th className="px-6 py-5 whitespace-nowrap">Bairro</th>
+                  <th className="px-6 py-5 whitespace-nowrap">Empresa</th>
+                  <th className="px-6 py-5 text-center whitespace-nowrap">Placa</th>
+                  <th className="px-6 py-5 whitespace-nowrap">Valor</th>
+                  <th className="px-6 py-5 print:hidden text-center whitespace-nowrap">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filteredServices.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Nenhum registro encontrado</td>
+                    <td colSpan={7} className="px-6 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Nenhum registro encontrado em {months[selectedMonth]}</td>
                   </tr>
                 ) : (
                   filteredServices.map((s) => (
                     <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-6 py-4 text-xs font-bold text-slate-500">{new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
-                      <td className="px-6 py-4 font-black text-slate-800 text-xs uppercase">{s.customerName}</td>
-                      <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">{s.neighborhood}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 text-xs font-bold text-slate-500 whitespace-nowrap">{new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
+                      <td className="px-6 py-4 font-black text-slate-800 text-xs uppercase whitespace-nowrap">{s.customerName}</td>
+                      <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">{s.neighborhood}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${s.company === Company.AIROTRACKER ? 'bg-[#FF5F15] text-white' : 'bg-blue-100 text-[#00AEEF]'}`}>{s.company}</span>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
                         <div className="inline-block px-3 py-1.5 bg-slate-900 rounded-lg shadow-sm">
                           <span className="text-[11px] font-mono font-black text-white uppercase tracking-wider">{s.plate}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs font-black text-slate-900">R$ {s.value.toFixed(2)}</td>
-                      <td className="px-6 py-4 print:hidden">
+                      <td className="px-6 py-4 text-xs font-black text-slate-900 whitespace-nowrap">R$ {s.value.toFixed(2)}</td>
+                      <td className="px-6 py-4 print:hidden whitespace-nowrap">
                         <div className="flex items-center justify-center space-x-2">
                           {s.status === ServiceStatus.CANCELADO && <button onClick={() => setViewingReason(s)} className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"><MessageSquare size={18} /></button>}
                           
@@ -276,14 +318,14 @@ const Services: React.FC<ServicesProps> = ({
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A192F]/60 backdrop-blur-md p-4 print:hidden">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in zoom-in duration-300">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{editingService ? 'Editar Registro' : 'Lançar Novo Serviço'}</h3>
-              <button onClick={() => setShowForm(false)} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><X size={24} /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A192F]/60 backdrop-blur-md p-4 print:hidden overflow-y-auto">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in duration-300 my-auto">
+            <div className="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between bg-white z-10">
+              <h3 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight">{editingService ? 'Editar Registro' : 'Lançar Novo Serviço'}</h3>
+              <button onClick={() => setShowForm(false)} className="p-2 md:p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><X size={24} /></button>
             </div>
-            <div className="p-10 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 md:p-10 space-y-6 md:space-y-8 max-h-[75vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Nome Completo do Cliente *</label>
                   <input type="text" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-[#00AEEF] text-slate-900 font-black uppercase" value={formData.customerName || ''} onChange={(e) => setFormData({...formData, customerName: e.target.value})} />
@@ -330,7 +372,7 @@ const Services: React.FC<ServicesProps> = ({
               </div>
 
               {formData.status === ServiceStatus.CANCELADO && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8 bg-rose-50 rounded-[2rem] border border-rose-100 animate-in slide-in-from-top-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 md:p-8 bg-rose-50 rounded-[2rem] border border-rose-100 animate-in slide-in-from-top-4">
                   <div>
                     <label className="block text-xs font-black text-slate-500 mb-2 ml-1">CANCELADO POR *</label>
                     <select className="w-full p-4 bg-white rounded-xl border-2 border-rose-200 font-black text-rose-700 outline-none" value={formData.cancelledBy || ''} onChange={(e) => setFormData({...formData, cancelledBy: e.target.value as CancelledBy})}>
@@ -346,14 +388,14 @@ const Services: React.FC<ServicesProps> = ({
               )}
 
               <div className="flex flex-col md:flex-row justify-end space-y-4 md:space-y-0 md:space-x-4 pt-10 border-t border-slate-100">
-                <button onClick={() => setShowForm(false)} disabled={isSaving} className="px-8 py-4 text-slate-400 font-black uppercase text-xs tracking-widest hover:text-slate-600">Descartar</button>
+                <button onClick={() => setShowForm(false)} disabled={isSaving} className="px-8 py-4 text-slate-400 font-black uppercase text-xs tracking-widest hover:text-slate-600 order-2 md:order-1">Descartar</button>
                 {!editingService && (
-                  <button onClick={() => handleSave(true)} disabled={isSaving} className="px-8 py-4 bg-white border-2 border-[#0A192F] text-[#0A192F] font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center space-x-2">
+                  <button onClick={() => handleSave(true)} disabled={isSaving} className="px-8 py-4 bg-white border-2 border-[#0A192F] text-[#0A192F] font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center space-x-2 order-3 md:order-2">
                     {isSaving ? <Loader2 className="animate-spin" size={20} /> : <CopyPlus size={20} className="text-[#00AEEF]" />}
                     <span>{isSaving ? 'Salvando...' : 'Salvar e Próximo'}</span>
                   </button>
                 )}
-                <button onClick={() => handleSave(false)} disabled={isSaving} className="px-12 py-4 bg-[#0A192F] text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl shadow-blue-900/10 hover:bg-slate-800 transition-all flex items-center justify-center space-x-2">
+                <button onClick={() => handleSave(false)} disabled={isSaving} className="px-12 py-4 bg-[#0A192F] text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl shadow-blue-900/10 hover:bg-slate-800 transition-all flex items-center justify-center space-x-2 order-1 md:order-3">
                   {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} className="text-[#00AEEF]" />}
                   <span>{isSaving ? 'Salvando...' : (editingService ? 'Salvar Alterações' : 'Concluir Registro')}</span>
                 </button>
@@ -365,7 +407,7 @@ const Services: React.FC<ServicesProps> = ({
 
       {viewingReason && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0A192F]/80 backdrop-blur-md p-4 animate-in fade-in duration-300 print:hidden">
-          <div className="bg-white p-10 rounded-[2.5rem] max-w-md w-full shadow-2xl">
+          <div className="bg-white p-8 md:p-10 rounded-[2.5rem] max-w-md w-full shadow-2xl">
             <h3 className="text-2xl font-black uppercase mb-6 text-rose-600 tracking-tight">Motivo do Cancelamento</h3>
             <div className="space-y-4">
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">

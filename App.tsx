@@ -6,9 +6,10 @@ import Services from './components/Services';
 import Users from './components/Users';
 import Profile from './components/Profile';
 import Login from './components/Login';
+import Logo from './components/Logo';
 import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB } from './lib/supabase';
 import { MOCK_USERS } from './constants';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Menu } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -18,6 +19,7 @@ const App: React.FC = () => {
   const [viewingTechnicianId, setViewingTechnicianId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -248,7 +250,7 @@ const App: React.FC = () => {
           />
         );
       case 'users':
-        if (currentUser.role !== UserRole.MASTER) return <div className="p-8">Acesso restrito.</div>;
+        if (currentUser.role !== UserRole.MASTER) return <div className="p-4 md:p-8">Acesso restrito.</div>;
         return <Users users={users} onSaveUser={handleSaveUser} onDeleteUser={handleDeleteUser} />;
       case 'profile':
         return <Profile user={currentUser} onUpdateUser={handleSaveUser} />;
@@ -258,14 +260,44 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
+      
+      {/* Mobile Header - Visible only on small screens */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-20 bg-white border-b border-slate-100 z-40 flex items-center justify-between px-6 shadow-sm">
+        <div className="flex items-center space-x-3">
+          <Logo size={32} />
+          <div className="flex flex-col">
+            <span className="text-lg font-black text-[#0A192F] uppercase tracking-tight leading-none">
+              AIRO<span className="text-red-600">TRACKER</span>
+            </span>
+            <div className="flex items-center">
+               <span className="text-red-600 text-[10px] font-black mr-0.5">+</span>
+               <span className="text-slate-800 text-[9px] font-black uppercase">Técnicos</span>
+            </div>
+          </div>
+        </div>
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)} 
+          className="p-2 text-slate-600 hover:bg-slate-50 rounded-xl"
+        >
+          <Menu size={28} />
+        </button>
+      </div>
+
       <Sidebar 
         activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+        setActiveTab={(tab) => {
+            setActiveTab(tab);
+            setIsMobileMenuOpen(false); // Fecha o menu ao clicar em um item no mobile
+        }} 
         currentUser={currentUser}
-        onLogout={handleLogout} 
+        onLogout={handleLogout}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
-      <main className="flex-1 overflow-y-auto bg-[#F8FAFC]">
+
+      {/* Main Content - Added pt-20 for mobile to account for fixed header */}
+      <main className="flex-1 overflow-y-auto pt-20 md:pt-0 transition-all duration-300">
         {renderContent()}
       </main>
     </div>
