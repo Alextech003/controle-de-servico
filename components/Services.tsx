@@ -126,8 +126,17 @@ const Services: React.FC<ServicesProps> = ({
     setIsSaving(false);
     
     if (keepOpen) { 
-      setFormData({ ...initialFormState, date: formData.date, value: 0.00 }); 
-      setEditingService(null); 
+      // Lógica alterada: Mantém os dados do cliente (Nome, Bairro, Data, Valor, Empresa)
+      // e limpa apenas os dados do veículo (Placa, Modelo) para facilitar inserção em lote.
+      setFormData(prev => ({
+        ...prev,
+        vehicle: '', // Limpa veículo
+        plate: ''    // Limpa placa
+        // Mantém customerName, date, neighborhood, value, company, type, status
+      }));
+      setEditingService(null); // Garante que o próximo save será um NOVO registro
+      
+      // Foca no campo de placa ou veículo se possível (opcional, via UX o usuário já percebe a limpeza)
     } else { 
       setShowForm(false); 
       setEditingService(null); 
@@ -392,7 +401,7 @@ const Services: React.FC<ServicesProps> = ({
                 {!editingService && (
                   <button onClick={() => handleSave(true)} disabled={isSaving} className="px-8 py-4 bg-white border-2 border-[#0A192F] text-[#0A192F] font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center space-x-2 order-3 md:order-2">
                     {isSaving ? <Loader2 className="animate-spin" size={20} /> : <CopyPlus size={20} className="text-[#00AEEF]" />}
-                    <span>{isSaving ? 'Salvando...' : 'Salvar e Próximo'}</span>
+                    <span>{isSaving ? 'Salvando...' : 'Salvar e Add. Veículo'}</span>
                   </button>
                 )}
                 <button onClick={() => handleSave(false)} disabled={isSaving} className="px-12 py-4 bg-[#0A192F] text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl shadow-blue-900/10 hover:bg-slate-800 transition-all flex items-center justify-center space-x-2 order-1 md:order-3">
