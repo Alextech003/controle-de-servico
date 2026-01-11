@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, UserRole, Service, ServiceStatus } from './types';
 import Sidebar from './components/Sidebar';
@@ -219,6 +218,8 @@ const App: React.FC = () => {
   }
 
   const renderContent = () => {
+    if (!currentUser) return null; // Guard clause para o TypeScript
+
     switch (activeTab) {
       case 'dashboard':
         return (

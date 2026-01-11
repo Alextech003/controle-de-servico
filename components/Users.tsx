@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { User, UserRole } from '../types';
 import { UserPlus, Phone, Lock, User as UserIcon, Trash2, Edit, X, Save, Camera, UserMinus, UserCheck, Eye, EyeOff } from 'lucide-react';
@@ -44,7 +43,7 @@ const Users: React.FC<UsersProps> = ({ users, onSaveUser, onDeleteUser }) => {
 
     const newUser: User = {
         ...formData,
-        id: editingUser ? editingUser.id : Math.random().toString(36).substr(2, 9),
+        id: editingUser ? editingUser.id : Math.random().toString(36).substring(2, 11),
     } as User;
 
     await onSaveUser(newUser);

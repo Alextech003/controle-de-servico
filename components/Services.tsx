@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   Plus, Search, FileText, Trash2, Edit, X, Save, 
@@ -95,7 +94,7 @@ const Services: React.FC<ServicesProps> = ({
     const serviceToSave: Service = {
         ...initialFormState,
         ...formData,
-        id: editingService ? editingService.id : Math.random().toString(36).substr(2, 9),
+        id: editingService ? editingService.id : Math.random().toString(36).substring(2, 11),
         technicianId: editingService ? editingService.technicianId : currentUser.id,
         technicianName: editingService ? editingService.technicianName : currentUser.name
     } as Service;
