@@ -3,7 +3,8 @@ import {
   Plus, Search, FileText, Trash2, Edit, X, Save, 
   MessageSquare, Table as TableIcon,
   ArrowRight, CopyPlus, Loader2,
-  Users as UsersIcon, Check, XCircle, ChevronLeft, ChevronRight
+  Users as UsersIcon, Check, XCircle, ChevronLeft, ChevronRight,
+  MapPin, CalendarDays
 } from 'lucide-react';
 import { 
   Service, ServiceStatus, ServiceType, Company, 
@@ -94,6 +95,39 @@ const Services: React.FC<ServicesProps> = ({
     });
   }, [services, searchTerm, activeFilter, selectedMonth, selectedYear]);
 
+  // Agrupamento por Data para a visualização
+  const groupedServices = useMemo(() => {
+    const groups: Record<string, Service[]> = {};
+    filteredServices.forEach(service => {
+        if (!groups[service.date]) {
+            groups[service.date] = [];
+        }
+        groups[service.date].push(service);
+    });
+    // Retorna ordenado (as chaves do objeto não garantem ordem, então vamos manipular no render)
+    return groups;
+  }, [filteredServices]);
+
+  // Helper para estilos de badge (Tipo de Serviço)
+  const getTypeStyle = (type: ServiceType) => {
+    switch (type) {
+        case ServiceType.INSTALACAO: return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        case ServiceType.MANUTENCAO: return 'bg-amber-100 text-amber-700 border-amber-200';
+        case ServiceType.RETIRADA: return 'bg-rose-100 text-rose-700 border-rose-200';
+        default: return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
+  // Helper para estilos de badge (Empresa)
+  const getCompanyStyle = (company: Company) => {
+      switch (company) {
+          case Company.AIROCLUBE: return 'bg-purple-100 text-purple-700 border-purple-200';
+          case Company.CARTRAC: return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+          case Company.AIROTRACKER: return 'bg-blue-100 text-blue-700 border-blue-200';
+          default: return 'bg-slate-100 text-slate-600 border-slate-200';
+      }
+  };
+
   const handleExportExcel = () => {
     const headers = "Data;Cliente;Bairro;Tipo;Empresa;Veículo;Placa;Valor;Status;Técnico\n";
     const csv = filteredServices.map(s => 
@@ -126,37 +160,29 @@ const Services: React.FC<ServicesProps> = ({
     setIsSaving(false);
     
     if (keepOpen) { 
-      // Lógica alterada: Mantém os dados do cliente (Nome, Bairro, Data, Valor, Empresa)
-      // e limpa apenas os dados do veículo (Placa, Modelo) para facilitar inserção em lote.
       setFormData(prev => ({
         ...prev,
-        vehicle: '', // Limpa veículo
-        plate: ''    // Limpa placa
-        // Mantém customerName, date, neighborhood, value, company, type, status
+        vehicle: '', 
+        plate: ''    
       }));
-      setEditingService(null); // Garante que o próximo save será um NOVO registro
-      
-      // Foca no campo de placa ou veículo se possível (opcional, via UX o usuário já percebe a limpeza)
+      setEditingService(null); 
     } else { 
       setShowForm(false); 
       setEditingService(null); 
     }
   };
 
-  // Função simples para iniciar a exclusão
   const initiateDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     setConfirmingDeleteId(id);
   };
 
-  // Função para confirmar a exclusão
   const confirmDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     await onDeleteService(id);
     setConfirmingDeleteId(null);
   };
 
-  // Função para cancelar a exclusão
   const cancelDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     setConfirmingDeleteId(null);
@@ -193,19 +219,12 @@ const Services: React.FC<ServicesProps> = ({
             <p className="text-slate-500 font-medium">Relatório Detalhado</p>
           </div>
           <div className="flex flex-col md:flex-row md:items-center gap-3">
-             {/* Seletor de Mês adicionado à tela de serviços */}
              <div className="flex items-center justify-between space-x-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
-                <button 
-                  onClick={handlePrevMonth} 
-                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors group"
-                >
+                <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-colors group">
                   <ChevronLeft size={20} className="text-[#00AEEF] group-active:scale-90 transition-transform" />
                 </button>
                 <div className="px-3 text-center min-w-[120px] font-black uppercase text-xs text-slate-800">{months[selectedMonth]} {selectedYear}</div>
-                <button 
-                  onClick={handleNextMonth} 
-                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors group"
-                >
+                <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-colors group">
                   <ChevronRight size={20} className="text-[#00AEEF] group-active:scale-90 transition-transform" />
                 </button>
              </div>
@@ -245,79 +264,100 @@ const Services: React.FC<ServicesProps> = ({
                   <th className="px-6 py-5 whitespace-nowrap">Data</th>
                   <th className="px-6 py-5 whitespace-nowrap">Cliente</th>
                   <th className="px-6 py-5 whitespace-nowrap">Bairro</th>
-                  <th className="px-6 py-5 whitespace-nowrap">Empresa</th>
+                  <th className="px-6 py-5 text-center whitespace-nowrap">Tipo</th>
+                  <th className="px-6 py-5 text-center whitespace-nowrap">Empresa</th>
                   <th className="px-6 py-5 text-center whitespace-nowrap">Placa</th>
-                  <th className="px-6 py-5 whitespace-nowrap">Valor</th>
+                  <th className="px-6 py-5 whitespace-nowrap text-right">Valor</th>
                   <th className="px-6 py-5 print:hidden text-center whitespace-nowrap">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredServices.length === 0 ? (
+                {Object.keys(groupedServices).length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Nenhum registro encontrado em {months[selectedMonth]}</td>
+                    <td colSpan={8} className="px-6 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Nenhum registro encontrado em {months[selectedMonth]}</td>
                   </tr>
                 ) : (
-                  filteredServices.map((s) => (
-                    <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-6 py-4 text-xs font-bold text-slate-500 whitespace-nowrap">{new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
-                      <td className="px-6 py-4 font-black text-slate-800 text-xs uppercase whitespace-nowrap">{s.customerName}</td>
-                      <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">{s.neighborhood}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${s.company === Company.AIROTRACKER ? 'bg-[#FF5F15] text-white' : 'bg-blue-100 text-[#00AEEF]'}`}>{s.company}</span>
-                      </td>
-                      <td className="px-6 py-4 text-center whitespace-nowrap">
-                        <div className="inline-block px-3 py-1.5 bg-slate-900 rounded-lg shadow-sm">
-                          <span className="text-[11px] font-mono font-black text-white uppercase tracking-wider">{s.plate}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-xs font-black text-slate-900 whitespace-nowrap">R$ {s.value.toFixed(2)}</td>
-                      <td className="px-6 py-4 print:hidden whitespace-nowrap">
-                        <div className="flex items-center justify-center space-x-2">
-                          {s.status === ServiceStatus.CANCELADO && <button onClick={() => setViewingReason(s)} className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"><MessageSquare size={18} /></button>}
-                          
-                          {/* Lógica de Edição e Exclusão Segura */}
-                          {canEdit && (
-                            <>
-                              {confirmingDeleteId === s.id ? (
-                                <div className="flex items-center bg-rose-50 rounded-xl p-1 animate-in zoom-in duration-200">
-                                   <button 
-                                      onClick={(e) => confirmDelete(e, s.id)}
-                                      className="p-1.5 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors mr-1"
-                                      title="Confirmar Exclusão"
-                                   >
-                                      <Check size={16} strokeWidth={3} />
-                                   </button>
-                                   <button 
-                                      onClick={cancelDelete}
-                                      className="p-1.5 text-slate-500 hover:bg-slate-200 rounded-lg transition-colors"
-                                      title="Cancelar"
-                                   >
-                                      <XCircle size={16} />
-                                   </button>
+                  Object.keys(groupedServices).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()).map(date => (
+                    <React.Fragment key={date}>
+                        {/* Linha Divisória de Data */}
+                        <tr className="bg-slate-50/50">
+                            <td colSpan={8} className="px-6 py-3">
+                                <div className="flex items-center w-full">
+                                    <div className="h-px bg-blue-200 flex-1"></div>
+                                    <div className="px-4 py-1.5 bg-white border border-blue-100 rounded-full flex items-center space-x-2 shadow-sm mx-4">
+                                        <CalendarDays size={14} className="text-[#00AEEF]" />
+                                        <span className="text-[11px] font-black text-slate-700 uppercase">
+                                            {new Date(date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                                        </span>
+                                        <span className="text-[11px] font-medium text-slate-400">•</span>
+                                        <span className="text-[11px] font-bold text-slate-500">
+                                            {groupedServices[date].length} {groupedServices[date].length === 1 ? 'serviço' : 'serviços'}
+                                        </span>
+                                    </div>
+                                    <div className="h-px bg-blue-200 flex-1"></div>
                                 </div>
-                              ) : (
-                                <>
-                                  <button 
-                                    type="button"
-                                    onClick={() => {setEditingService(s); setFormData(s); setShowForm(true);}} 
-                                    className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                  >
-                                    <Edit size={18} />
-                                  </button>
-                                  <button 
-                                    type="button"
-                                    onClick={(e) => initiateDelete(e, s.id)}
-                                    className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
-                                </>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                            </td>
+                        </tr>
+
+                        {/* Serviços do Dia */}
+                        {groupedServices[date].map((s) => (
+                            <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
+                                <td className="px-6 py-4 text-xs font-bold text-slate-400 whitespace-nowrap">{new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
+                                <td className="px-6 py-4 font-black text-slate-800 text-xs uppercase whitespace-nowrap">{s.customerName}</td>
+                                <td className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase whitespace-nowrap">
+                                    <div className="flex items-center">
+                                        <MapPin size={14} className="text-slate-300 mr-1.5" />
+                                        {s.neighborhood}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-center whitespace-nowrap">
+                                    <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${getTypeStyle(s.type)}`}>
+                                        {s.type}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-center whitespace-nowrap">
+                                    <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${getCompanyStyle(s.company)}`}>
+                                        {s.company}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-center whitespace-nowrap">
+                                    <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider">{s.plate}</span>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-black text-slate-900 whitespace-nowrap text-right">
+                                    {s.value === 0 ? '' : `R$ ${s.value.toFixed(2)}`}
+                                </td>
+                                <td className="px-6 py-4 print:hidden whitespace-nowrap">
+                                    <div className="flex items-center justify-center space-x-2">
+                                    {s.status === ServiceStatus.CANCELADO && <button onClick={() => setViewingReason(s)} className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"><MessageSquare size={18} /></button>}
+                                    
+                                    {canEdit && (
+                                        <>
+                                        {confirmingDeleteId === s.id ? (
+                                            <div className="flex items-center bg-rose-50 rounded-xl p-1 animate-in zoom-in duration-200">
+                                            <button onClick={(e) => confirmDelete(e, s.id)} className="p-1.5 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors mr-1">
+                                                <Check size={16} strokeWidth={3} />
+                                            </button>
+                                            <button onClick={cancelDelete} className="p-1.5 text-slate-500 hover:bg-slate-200 rounded-lg transition-colors">
+                                                <XCircle size={16} />
+                                            </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                            <button type="button" onClick={() => {setEditingService(s); setFormData(s); setShowForm(true);}} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                <Edit size={18} />
+                                            </button>
+                                            <button type="button" onClick={(e) => initiateDelete(e, s.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                                                <Trash2 size={18} />
+                                            </button>
+                                            </>
+                                        )}
+                                        </>
+                                    )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </React.Fragment>
                   ))
                 )}
               </tbody>
