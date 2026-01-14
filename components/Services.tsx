@@ -321,7 +321,10 @@ const Services: React.FC<ServicesProps> = ({
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-center whitespace-nowrap">
-                                    <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider">{s.plate}</span>
+                                    {/* PLACA COM ESTILO PERSONALIZADO: Fundo Cinza Médio, Letra Preta, Borda */}
+                                    <span className="inline-block px-3 py-1 bg-[#cbd5e1] text-black border-2 border-[#94a3b8] rounded-md text-[11px] font-black uppercase tracking-widest shadow-sm min-w-[90px]">
+                                        {s.plate}
+                                    </span>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-black text-slate-900 whitespace-nowrap text-right">
                                     {s.value === 0 ? '' : `R$ ${s.value.toFixed(2)}`}
