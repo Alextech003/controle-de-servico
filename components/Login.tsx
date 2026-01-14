@@ -47,18 +47,103 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   return (
     <div className="min-h-screen w-full flex font-sans bg-white overflow-hidden">
       
+      {/* Estilos da Animação Injetados Localmente */}
+      <style>{`
+        @keyframes move-traffic {
+          0% { transform: translateY(-100%); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(150vh); opacity: 0; }
+        }
+        .traffic-lane {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 1px;
+          background: rgba(255, 255, 255, 0.05);
+        }
+        .vehicle {
+          position: absolute;
+          width: 4px;
+          height: 60px;
+          background: linear-gradient(to bottom, transparent, #00AEEF, transparent);
+          border-radius: 4px;
+          animation: move-traffic linear infinite;
+          opacity: 0;
+          box-shadow: 0 0 15px #00AEEF;
+        }
+        .vehicle-red {
+          background: linear-gradient(to bottom, transparent, #FF3D3D, transparent);
+          box-shadow: 0 0 15px #FF3D3D;
+        }
+        /* Grid do Mapa */
+        .map-grid {
+          background-size: 50px 50px;
+          background-image:
+            linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          transform: perspective(500px) rotateX(20deg);
+          transform-origin: top;
+        }
+      `}</style>
+
       {/* LADO ESQUERDO - BRANDING (Escuro) */}
       <div className="hidden lg:flex w-1/2 bg-[#0A192F] relative flex-col items-center justify-center p-12 overflow-hidden">
-        {/* Efeitos de Fundo */}
-        <div className="absolute top-[-20%] right-[-20%] w-[600px] h-[600px] bg-[#00AEEF]/10 rounded-full blur-[120px] pointer-events-none"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-white/5 rounded-full blur-[80px] pointer-events-none"></div>
+        
+        {/* --- CAMADA DE ANIMAÇÃO DE FUNDO (NOVA) --- */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          
+          {/* Fundo Base */}
+          <div className="absolute inset-0 bg-[#050B14]"></div>
+
+          {/* Grid em Perspectiva (Simulando Mapa 3D) */}
+          <div className="absolute inset-[-50%] w-[200%] h-[200%] map-grid"></div>
+
+          {/* Faixas de Tráfego e Veículos */}
+          {/* Faixa 1 - Esquerda */}
+          <div className="traffic-lane left-[10%]">
+             <div className="vehicle" style={{ animationDuration: '3s', animationDelay: '0s' }}></div>
+             <div className="vehicle" style={{ animationDuration: '3s', animationDelay: '1.5s' }}></div>
+          </div>
+
+          {/* Faixa 2 */}
+          <div className="traffic-lane left-[25%]">
+             <div className="vehicle vehicle-red" style={{ animationDuration: '4.5s', animationDelay: '0.5s' }}></div>
+          </div>
+
+          {/* Faixa 3 - Central Rápida */}
+          <div className="traffic-lane left-[40%]">
+             <div className="vehicle" style={{ height: '100px', animationDuration: '2s', animationDelay: '0.2s' }}></div>
+             <div className="vehicle" style={{ height: '100px', animationDuration: '2s', animationDelay: '1.2s' }}></div>
+          </div>
+          
+          {/* Faixa 4 - Central Rápida Inversa (Vermelha) */}
+          <div className="traffic-lane left-[60%]">
+             <div className="vehicle vehicle-red" style={{ height: '80px', animationDuration: '2.5s', animationDelay: '1s' }}></div>
+          </div>
+
+          {/* Faixa 5 */}
+          <div className="traffic-lane left-[80%]">
+             <div className="vehicle" style={{ animationDuration: '5s', animationDelay: '2s' }}></div>
+          </div>
+
+          {/* Faixa 6 - Direita */}
+          <div className="traffic-lane left-[90%]">
+             <div className="vehicle vehicle-red" style={{ animationDuration: '3.5s', animationDelay: '0s' }}></div>
+          </div>
+
+          {/* Overlay Gradiente para suavizar e dar foco no conteúdo */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A192F] via-[#0A192F]/80 to-[#0A192F]"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0A192F] via-transparent to-[#0A192F]"></div>
+        </div>
+        {/* --- FIM DA ANIMAÇÃO --- */}
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-lg">
           <div className="bg-white rounded-[2.5rem] w-48 h-48 flex items-center justify-center shadow-2xl mb-10 animate-in zoom-in duration-700">
              <Logo size={120} />
           </div>
           
-          <h1 className="text-5xl font-black text-white uppercase tracking-tighter mb-2 leading-none">
+          <h1 className="text-5xl font-black text-white uppercase tracking-tighter mb-2 leading-none drop-shadow-2xl">
             AIRO<span className="text-red-600">TRACKER</span>
           </h1>
           <div className="flex items-center justify-center mb-8 gap-2">
@@ -71,15 +156,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           </p>
 
           <div className="grid grid-cols-3 gap-6 w-full">
-             <div className="bg-[#112240] border border-slate-700/50 p-6 rounded-3xl flex flex-col items-center justify-center group hover:bg-[#1A2F55] transition-colors">
+             <div className="bg-[#112240]/80 backdrop-blur-sm border border-slate-700/50 p-6 rounded-3xl flex flex-col items-center justify-center group hover:bg-[#1A2F55] transition-colors shadow-lg">
                 <span className="text-3xl font-black text-white mb-1">100%</span>
                 <span className="text-[8px] font-black text-[#00AEEF] uppercase tracking-widest">Operacional</span>
              </div>
-             <div className="bg-[#112240] border border-slate-700/50 p-6 rounded-3xl flex flex-col items-center justify-center group hover:bg-[#1A2F55] transition-colors">
+             <div className="bg-[#112240]/80 backdrop-blur-sm border border-slate-700/50 p-6 rounded-3xl flex flex-col items-center justify-center group hover:bg-[#1A2F55] transition-colors shadow-lg">
                 <span className="text-xl font-black text-white mb-1 uppercase">Cloud</span>
                 <span className="text-[8px] font-black text-[#00AEEF] uppercase tracking-widest">Sincronizado</span>
              </div>
-             <div className="bg-[#112240] border border-slate-700/50 p-6 rounded-3xl flex flex-col items-center justify-center group hover:bg-[#1A2F55] transition-colors">
+             <div className="bg-[#112240]/80 backdrop-blur-sm border border-slate-700/50 p-6 rounded-3xl flex flex-col items-center justify-center group hover:bg-[#1A2F55] transition-colors shadow-lg">
                 <span className="text-3xl font-black text-white mb-1">BI</span>
                 <span className="text-[8px] font-black text-[#00AEEF] uppercase tracking-widest">Inteligência</span>
              </div>
