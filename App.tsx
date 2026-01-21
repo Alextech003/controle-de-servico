@@ -9,6 +9,7 @@ import Profile from './components/Profile';
 import Login from './components/Login';
 import Logo from './components/Logo';
 import MonthlyReminder from './components/MonthlyReminder';
+import ReimbursementIntro from './components/ReimbursementIntro';
 import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB, mapReimbursementFromDB, mapReimbursementToDB } from './lib/supabase';
 import { MOCK_USERS, MOCK_REIMBURSEMENTS } from './constants';
 import { Loader2, Menu } from 'lucide-react';
@@ -284,6 +285,7 @@ const App: React.FC = () => {
     <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
       
       {currentUser && <MonthlyReminder currentUser={currentUser} />}
+      {currentUser && <ReimbursementIntro />}
 
       <div className="md:hidden fixed top-0 left-0 right-0 h-20 bg-white border-b border-slate-100 z-40 flex items-center justify-between px-6 shadow-sm">
         <div className="flex items-center space-x-3">
