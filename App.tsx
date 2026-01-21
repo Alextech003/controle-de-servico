@@ -1,21 +1,23 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, UserRole, Service, ServiceStatus } from './types';
+import { User, UserRole, Service, ServiceStatus, Reimbursement } from './types';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Services from './components/Services';
+import Reimbursements from './components/Reimbursements';
 import Users from './components/Users';
 import Profile from './components/Profile';
 import Login from './components/Login';
 import Logo from './components/Logo';
 import MonthlyReminder from './components/MonthlyReminder';
-import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB } from './lib/supabase';
-import { MOCK_USERS } from './constants';
+import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB, mapReimbursementFromDB, mapReimbursementToDB } from './lib/supabase';
+import { MOCK_USERS, MOCK_REIMBURSEMENTS } from './constants';
 import { Loader2, Menu } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'users' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'reimbursements' | 'users' | 'profile'>('dashboard');
   const [services, setServices] = useState<Service[]>([]);
+  const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [viewingTechnicianId, setViewingTechnicianId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,17 +46,14 @@ const App: React.FC = () => {
       // Buscar Usuários
       const { data: usersData, error: usersError } = await supabase.from('users').select('*');
       
-      // Tratamento para quando a chave é inválida mas queremos ver o app funcionando
       if (usersError && (usersError.code === 'PGRST301' || usersError.message?.includes('JWT') || usersError.message?.includes('API key'))) {
           console.warn("Modo Offline/Demo Ativado: Chave Supabase inválida detectada.");
-          // Se falhar o banco, usa os mocks
           setUsers(MOCK_USERS);
+          setReimbursements(MOCK_REIMBURSEMENTS);
       } else if (usersError) {
           throw usersError;
       } else {
-        // SE O BANCO ESTIVER VAZIO (PRIMEIRA VEZ), CRIA OS USUÁRIOS PADRÃO
         if (!usersData || usersData.length === 0) {
-            console.log("Banco de usuários vazio ou inacessível.");
             setUsers(MOCK_USERS);
         } else {
             setUsers(usersData.map(mapUserFromDB));
@@ -63,16 +62,24 @@ const App: React.FC = () => {
 
       // Buscar Serviços
       const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').order('date', { ascending: false });
-      
       if (!servicesError && servicesData) {
           setServices(servicesData.map(mapServiceFromDB));
+      }
+
+      // Buscar Reembolsos
+      const { data: reimbData, error: reimbError } = await supabase.from('reimbursements').select('*').order('date', { ascending: false });
+      if (!reimbError && reimbData) {
+          setReimbursements(reimbData.map(mapReimbursementFromDB));
+      } else {
+          // Fallback se a tabela não existir ainda
+          setReimbursements(MOCK_REIMBURSEMENTS);
       }
       
       setDbError(null);
     } catch (error: any) {
       console.error("Erro ao conectar com banco:", error);
-      // Não bloqueia o app completamente em caso de erro, permite o uso local dos mocks
       setUsers(prev => prev.length > 0 ? prev : MOCK_USERS);
+      setReimbursements(prev => prev.length > 0 ? prev : MOCK_REIMBURSEMENTS);
     }
   };
 
@@ -91,11 +98,9 @@ const App: React.FC = () => {
   // --- CRUD Serviços ---
   const handleSaveService = async (service: Service) => {
     try {
-      // Verifica se é edição (existe no array) ou novo
       const exists = services.find(s => s.id === service.id);
       const dbPayload = mapServiceToDB(service);
 
-      // Atualiza localmente primeiro
       if (exists) {
         setServices(prev => prev.map(s => s.id === service.id ? service : s));
         await supabase.from('services').update(dbPayload).eq('id', service.id);
@@ -109,37 +114,37 @@ const App: React.FC = () => {
   };
 
   const handleDeleteService = async (id: string) => {
-    console.log("Tentando excluir serviço ID:", id);
-    
-    // 1. Snapshot para rollback (segurança)
     const previousServices = [...services];
-
-    // 2. ATUALIZAÇÃO OTIMISTA: Remove da tela IMEDIATAMENTE
     setServices(prev => prev.filter(s => String(s.id) !== String(id)));
 
     try {
-      // 3. Envia comando ao banco em segundo plano
       const { error } = await supabase.from('services').delete().eq('id', id);
-      
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
     } catch (error: any) {
-      console.error("Erro no banco de dados:", error);
-      
-      // CRÍTICO: Se o erro for de autenticação (chave ruim) ou permissão,
-      // NÃO REVERTE a mudança visual. Assumimos que o usuário quer ver a ação funcionando
-      // mesmo que o backend esteja mal configurado.
       const isAuthError = error.message?.includes('JWT') || error.code === '401' || error.message?.includes('API key');
-      
       if (!isAuthError) {
           alert(`Erro ao excluir no servidor: ${error.message}. Revertendo ação.`);
-          // 4. Rollback: Devolve o item APENAS se for um erro real de sistema, não de config
           setServices(previousServices);
-      } else {
-          console.warn("Exclusão realizada apenas localmente (Chave API inválida).");
       }
     }
+  };
+
+  // --- CRUD Reembolsos ---
+  const handleSaveReimbursement = async (reimbursement: Reimbursement) => {
+    try {
+      setReimbursements(prev => [reimbursement, ...prev]);
+      const dbPayload = mapReimbursementToDB(reimbursement);
+      await supabase.from('reimbursements').insert(dbPayload);
+    } catch (error) {
+      console.error("Salvo localmente apenas.", error);
+    }
+  };
+
+  const handleDeleteReimbursement = async (id: string) => {
+     setReimbursements(prev => prev.filter(r => r.id !== id));
+     try {
+       await supabase.from('reimbursements').delete().eq('id', id);
+     } catch (error) { console.error(error); }
   };
 
   // --- CRUD Usuários ---
@@ -174,7 +179,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Serviços visíveis
+  // Dados Visíveis
   const visibleServices = useMemo(() => {
     if (!currentUser) return [];
     if (currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN) {
@@ -184,7 +189,14 @@ const App: React.FC = () => {
     return services.filter(s => s.technicianId === currentUser.id);
   }, [services, currentUser, viewingTechnicianId]);
 
-  // Dashboard
+  const visibleReimbursements = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN) {
+      return reimbursements;
+    }
+    return reimbursements.filter(r => r.technicianId === currentUser.id);
+  }, [reimbursements, currentUser]);
+
   const dashboardServices = useMemo(() => {
     if (!currentUser) return [];
     if (currentUser.role === UserRole.TECHNICIAN) {
@@ -205,8 +217,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Se houver erro de banco crítico que impeça o uso (e não tivermos mock), mostra erro.
-  // Mas agora a lógica tenta usar mocks se o banco falhar.
   if (dbError && users.length === 0) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-rose-50 p-8 text-center">
@@ -221,7 +231,7 @@ const App: React.FC = () => {
   }
 
   const renderContent = () => {
-    if (!currentUser) return null; // Guard clause para o TypeScript
+    if (!currentUser) return null;
 
     switch (activeTab) {
       case 'dashboard':
@@ -250,6 +260,16 @@ const App: React.FC = () => {
             onFilterByTech={(id) => setViewingTechnicianId(id)}
           />
         );
+      case 'reimbursements':
+        return (
+          <Reimbursements
+            reimbursements={visibleReimbursements}
+            currentUser={currentUser}
+            users={users}
+            onSaveReimbursement={handleSaveReimbursement}
+            onDeleteReimbursement={handleDeleteReimbursement}
+          />
+        );
       case 'users':
         if (currentUser.role !== UserRole.MASTER) return <div className="p-4 md:p-8">Acesso restrito.</div>;
         return <Users users={users} onSaveUser={handleSaveUser} onDeleteUser={handleDeleteUser} />;
@@ -263,10 +283,8 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
       
-      {/* Componente de Lembrete Mensal */}
       {currentUser && <MonthlyReminder currentUser={currentUser} />}
 
-      {/* Mobile Header - Visible only on small screens */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-20 bg-white border-b border-slate-100 z-40 flex items-center justify-between px-6 shadow-sm">
         <div className="flex items-center space-x-3">
           <Logo size={32} />
@@ -292,7 +310,7 @@ const App: React.FC = () => {
         activeTab={activeTab} 
         setActiveTab={(tab) => {
             setActiveTab(tab);
-            setIsMobileMenuOpen(false); // Fecha o menu ao clicar em um item no mobile
+            setIsMobileMenuOpen(false); 
         }} 
         currentUser={currentUser}
         onLogout={handleLogout}
@@ -300,7 +318,6 @@ const App: React.FC = () => {
         onClose={() => setIsMobileMenuOpen(false)}
       />
 
-      {/* Main Content - Added pt-20 for mobile to account for fixed header */}
       <main className="flex-1 overflow-y-auto pt-20 md:pt-0 transition-all duration-300">
         {renderContent()}
       </main>

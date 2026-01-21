@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Service, User, ServiceType, Company, ServiceStatus, CancelledBy, UserRole } from '../types';
+import { Service, User, ServiceType, Company, ServiceStatus, CancelledBy, UserRole, Reimbursement, ReimbursementType, ReimbursementStatus } from '../types';
 
 // =========================================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS
@@ -69,4 +69,28 @@ export const mapUserToDB = (u: Partial<User>) => ({
   role: u.role,
   is_active: u.isActive,
   avatar: u.avatar
+});
+
+export const mapReimbursementFromDB = (r: any): Reimbursement => ({
+  id: r.id,
+  date: r.date,
+  type: r.type as ReimbursementType,
+  description: r.description,
+  value: Number(r.value),
+  receiptUrl: r.receipt_url,
+  status: r.status as ReimbursementStatus,
+  technicianId: r.technician_id,
+  technicianName: r.technician_name
+});
+
+export const mapReimbursementToDB = (r: Partial<Reimbursement>) => ({
+  id: r.id,
+  date: r.date,
+  type: r.type,
+  description: r.description,
+  value: r.value,
+  receipt_url: r.receiptUrl,
+  status: r.status,
+  technician_id: r.technicianId,
+  technician_name: r.technicianName
 });

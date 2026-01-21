@@ -28,6 +28,22 @@ export enum Company {
   CARTRAC = 'Cartrac'
 }
 
+export enum ReimbursementType {
+  COMBUSTIVEL = 'Combustível',
+  PEDAGIO = 'Pedágio',
+  ESTACIONAMENTO = 'Estacionamento',
+  ALIMENTACAO = 'Alimentação',
+  MATERIAL = 'Material/Peças',
+  OUTROS = 'Outros'
+}
+
+export enum ReimbursementStatus {
+  PENDENTE = 'PENDENTE',
+  APROVADO = 'APROVADO',
+  REJEITADO = 'REJEITADO',
+  PAGO = 'PAGO'
+}
+
 export interface User {
   id: string;
   name: string;
@@ -53,4 +69,16 @@ export interface Service {
   technicianName: string;
   cancellationReason?: string;
   cancelledBy?: CancelledBy;
+}
+
+export interface Reimbursement {
+  id: string;
+  date: string;
+  type: ReimbursementType;
+  description: string;
+  value: number;
+  receiptUrl?: string; // Base64 ou URL
+  status: ReimbursementStatus;
+  technicianId: string;
+  technicianName: string;
 }

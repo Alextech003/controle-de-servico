@@ -1,5 +1,5 @@
 
-import { User, UserRole, Service, ServiceStatus, ServiceType, Company, CancelledBy } from './types';
+import { User, UserRole, Service, ServiceStatus, ServiceType, Company, CancelledBy, Reimbursement, ReimbursementType, ReimbursementStatus } from './types';
 
 export const MOCK_USERS: User[] = [
   // Usuários Administrativos
@@ -73,5 +73,38 @@ export const MOCK_SERVICES: Service[] = [
     technicianName: 'Lucas Silva',
     cancellationReason: 'Cliente não estava no local',
     cancelledBy: CancelledBy.TECNICO
+  }
+];
+
+export const MOCK_REIMBURSEMENTS: Reimbursement[] = [
+  {
+    id: 'r1',
+    date: '2024-02-01',
+    type: ReimbursementType.COMBUSTIVEL,
+    description: 'Abastecimento para rota Zona Sul',
+    value: 150.00,
+    status: ReimbursementStatus.PENDENTE,
+    technicianId: '3',
+    technicianName: 'José Técnico'
+  },
+  {
+    id: 'r2',
+    date: '2024-02-02',
+    type: ReimbursementType.PEDAGIO,
+    description: 'Pedágio Linha Amarela',
+    value: 18.60,
+    status: ReimbursementStatus.APROVADO,
+    technicianId: '3',
+    technicianName: 'José Técnico'
+  },
+  {
+    id: 'r3',
+    date: '2024-02-01',
+    type: ReimbursementType.MATERIAL,
+    description: 'Fita isolante e conectores',
+    value: 45.00,
+    status: ReimbursementStatus.PAGO,
+    technicianId: '4',
+    technicianName: 'Lucas Silva'
   }
 ];
