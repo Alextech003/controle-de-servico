@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { 
   Plus, Search, Trash2, X, Save, 
   CalendarDays, ChevronLeft, ChevronRight,
-  Eye, Receipt, Upload, Loader2, DollarSign
+  Eye, Receipt, Upload, Loader2, DollarSign, FileText
 } from 'lucide-react';
 import { 
   Reimbursement, ReimbursementType, ReimbursementStatus, User, UserRole 
@@ -83,7 +83,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     return groups;
   }, [filteredReimbursements]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -92,6 +92,26 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const isPdf = (url: string) => {
+      return url.includes('application/pdf') || url.toLowerCase().endsWith('.pdf');
+  };
+
+  // Lógica para formatação de moeda automática
+  const formatCurrencyValue = (value: number) => {
+    if (value === undefined || value === null) return '0,00';
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let rawValue = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
+    if (!rawValue) rawValue = '0';
+    
+    // Converte para float dividindo por 100 para ter as duas casas decimais
+    const floatValue = parseInt(rawValue, 10) / 100;
+    
+    setFormData({ ...formData, value: floatValue });
   };
 
   const handleSave = async () => {
@@ -225,7 +245,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                                             <Eye size={18} />
                                         </button>
                                     ) : (
-                                        <span className="text-[9px] text-slate-300 font-bold uppercase">Sem Foto</span>
+                                        <span className="text-[9px] text-slate-300 font-bold uppercase">Sem Anexo</span>
                                     )}
                                 </td>
                                 <td className="px-6 py-4 text-center">
@@ -274,16 +294,16 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                         <input type="text" placeholder="Ex: Pedágio ida Itaguaí" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 placeholder:text-slate-300" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
                     </div>
                     <div>
-                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Valor</label>
+                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Valor (R$)</label>
                         <div className="relative">
                             <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input 
-                              type="number" 
-                              step="0.01" 
+                              type="text" 
+                              inputMode="numeric"
                               placeholder="0,00"
                               className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900 placeholder:text-slate-300" 
-                              value={formData.value || ''} 
-                              onChange={(e) => setFormData({...formData, value: parseFloat(e.target.value)})} 
+                              value={formatCurrencyValue(formData.value || 0)} 
+                              onChange={handleCurrencyChange} 
                             />
                         </div>
                     </div>
@@ -291,12 +311,16 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                         <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Comprovante</label>
                         <div onClick={() => fileInputRef.current?.click()} className="w-full py-4 bg-blue-50 border-2 border-dashed border-blue-200 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-blue-100 transition-colors text-blue-600 font-bold text-sm">
                             {formData.receiptUrl ? (
-                                <span className="flex items-center"><Receipt size={18} className="mr-2" /> Foto Anexada</span>
+                                isPdf(formData.receiptUrl) ? (
+                                    <span className="flex items-center"><FileText size={18} className="mr-2" /> PDF Selecionado</span>
+                                ) : (
+                                    <span className="flex items-center"><Receipt size={18} className="mr-2" /> Foto Selecionada</span>
+                                )
                             ) : (
-                                <span className="flex items-center"><Upload size={18} className="mr-2" /> Anexar Foto</span>
+                                <span className="flex items-center"><Upload size={18} className="mr-2" /> Foto ou PDF</span>
                             )}
                         </div>
-                        <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*,application/pdf" />
                     </div>
                 </div>
 
@@ -314,11 +338,20 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
       {/* Visualizador de Comprovante */}
       {viewingReceipt && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-300" onClick={() => setViewingReceipt(null)}>
-            <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center">
+            <div className="relative max-w-4xl w-full max-h-[95vh] flex flex-col items-center">
                 <button className="absolute -top-12 right-0 text-white hover:text-rose-500 transition-colors" onClick={() => setViewingReceipt(null)}>
                     <X size={32} />
                 </button>
-                <img src={viewingReceipt} alt="Comprovante" className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain bg-white" />
+                
+                {isPdf(viewingReceipt) ? (
+                    <iframe 
+                        src={viewingReceipt} 
+                        className="w-full h-[85vh] rounded-lg shadow-2xl bg-white"
+                        title="Comprovante PDF"
+                    ></iframe>
+                ) : (
+                    <img src={viewingReceipt} alt="Comprovante" className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain bg-white" />
+                )}
             </div>
         </div>
       )}
