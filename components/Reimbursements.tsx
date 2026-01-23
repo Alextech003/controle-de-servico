@@ -4,7 +4,8 @@ import {
   Plus, Search, Trash2, X, Save, 
   CalendarDays, ChevronLeft, ChevronRight,
   Eye, Receipt, Upload, Loader2, DollarSign, FileText,
-  Edit, Calculator, AlertCircle, Users, ArrowRight, ArrowLeft
+  Edit, Calculator, AlertCircle, Users, ArrowRight, ArrowLeft,
+  CheckCircle2, Clock, Banknote
 } from 'lucide-react';
 import { 
   Reimbursement, ReimbursementType, ReimbursementStatus, User, UserRole 
@@ -71,6 +72,8 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
   };
 
   const isManager = currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN;
+  const isAdmin = currentUser.role === UserRole.ADMIN;
+  const isMaster = currentUser.role === UserRole.MASTER;
 
   // Filtra reembolsos baseados no mês, ano e (se for admin) no técnico selecionado
   const filteredReimbursements = useMemo(() => {
@@ -137,11 +140,13 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
             }, 0);
 
         const pendingCount = reimbursements.filter(r => r.technicianId === tech.id && r.status === ReimbursementStatus.PENDENTE && new Date(r.date + 'T12:00:00').getMonth() === selectedMonth).length;
+        const waitingCount = reimbursements.filter(r => r.technicianId === tech.id && r.status === ReimbursementStatus.AGUARDANDO_CONFIRMACAO && new Date(r.date + 'T12:00:00').getMonth() === selectedMonth).length;
 
         return {
             ...tech,
             monthTotal: techMonthTotal,
-            pendingCount
+            pendingCount,
+            waitingCount
         };
     });
   }, [users, reimbursements, selectedMonth, selectedYear, isManager]);
@@ -211,6 +216,27 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     setEditingReimbursement(null);
   };
 
+  // Funções de Fluxo de Pagamento
+  const handleMarkAsPaid = async (r: Reimbursement) => {
+    const confirm = window.confirm(`Deseja realizar o pagamento de ${r.value.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} para ${r.technicianName}?`);
+    if (confirm) {
+      await onSaveReimbursement({
+        ...r,
+        status: ReimbursementStatus.AGUARDANDO_CONFIRMACAO
+      });
+    }
+  };
+
+  const handleConfirmReceipt = async (r: Reimbursement) => {
+    const confirm = window.confirm("Você confirma que recebeu este valor em sua conta?");
+    if (confirm) {
+      await onSaveReimbursement({
+        ...r,
+        status: ReimbursementStatus.PAGO
+      });
+    }
+  };
+
   const getTypeColor = (type: ReimbursementType) => {
     switch (type) {
       case ReimbursementType.COMBUSTIVEL: return 'text-amber-600 bg-amber-50 border-amber-200';
@@ -225,6 +251,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     switch (status) {
       case ReimbursementStatus.APROVADO: return 'text-emerald-600 bg-emerald-50';
       case ReimbursementStatus.PAGO: return 'text-blue-600 bg-blue-50';
+      case ReimbursementStatus.AGUARDANDO_CONFIRMACAO: return 'text-indigo-600 bg-indigo-50 border border-indigo-100';
       case ReimbursementStatus.REJEITADO: return 'text-rose-600 bg-rose-50';
       default: return 'text-amber-600 bg-amber-50';
     }
@@ -279,12 +306,20 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                                     <span className="text-[10px] font-bold text-slate-400 uppercase">Total Mês</span>
                                     <span className="text-sm font-black text-slate-900">{tech.monthTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                                 </div>
-                                {tech.pendingCount > 0 && (
-                                    <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-xl">
-                                        <AlertCircle size={14} />
-                                        <span className="text-[10px] font-black uppercase">{tech.pendingCount} pendentes</span>
-                                    </div>
-                                )}
+                                <div className="flex gap-2">
+                                    {tech.pendingCount > 0 && (
+                                        <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-xl flex-1 justify-center">
+                                            <AlertCircle size={14} />
+                                            <span className="text-[10px] font-black uppercase">{tech.pendingCount} pendentes</span>
+                                        </div>
+                                    )}
+                                    {tech.waitingCount > 0 && (
+                                        <div className="flex items-center space-x-2 text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl flex-1 justify-center">
+                                            <Clock size={14} />
+                                            <span className="text-[10px] font-black uppercase">{tech.waitingCount} aguardando</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             
                             <div className="mt-6 flex justify-end">
@@ -339,6 +374,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                 </button>
              </div>
              
+             {/* Admin não pode criar despesa em nome do técnico, ou pode? O prompt não proíbe, mas geralmente é o técnico que cria. Vamos manter. */}
              <button onClick={() => { setEditingReimbursement(null); setFormData(initialFormState); setShowForm(true); }} className="px-6 py-3 bg-[#0A192F] text-white rounded-xl text-sm font-black uppercase shadow-xl shadow-blue-900/10 active:scale-95 transition-all flex items-center justify-center space-x-2">
                 <Plus size={20} className="text-[#00AEEF]" />
                 <span>Nova Despesa</span>
@@ -399,7 +435,17 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                                 </div>
                             </td>
                         </tr>
-                        {groupedReimbursements[date].map((r) => (
+                        {groupedReimbursements[date].map((r) => {
+                            // Logic para exibir botões
+                            const canManagePayment = isManager && (r.status === ReimbursementStatus.PENDENTE || r.status === ReimbursementStatus.APROVADO);
+                            const canConfirmReceipt = !isManager && r.status === ReimbursementStatus.AGUARDANDO_CONFIRMACAO;
+                            
+                            // Regra: Admin NÃO pode editar nem excluir nada.
+                            // Master pode editar/excluir.
+                            // Técnico pode editar/excluir SE estiver pendente.
+                            const canEditDelete = isMaster || (!isAdmin && r.status === ReimbursementStatus.PENDENTE);
+
+                            return (
                             <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                                 <td className="px-6 py-4 text-xs font-bold text-slate-400 whitespace-nowrap">{new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
                                 <td className="px-6 py-4 text-xs font-black text-slate-800 uppercase whitespace-nowrap">{r.technicianName}</td>
@@ -439,22 +485,50 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                                 </td>
                                 <td className="px-6 py-4 text-center">
                                     <div className="flex items-center justify-center space-x-2">
-                                        {confirmingDeleteId === r.id ? (
-                                            <button onClick={() => { onDeleteReimbursement(r.id); setConfirmingDeleteId(null); }} className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded">Confirmar</button>
-                                        ) : (
+                                        
+                                        {/* Botão de Pagamento (Admin/Master) */}
+                                        {canManagePayment && (
+                                            <button 
+                                                onClick={() => handleMarkAsPaid(r)}
+                                                className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase shadow-lg shadow-emerald-200 transition-all"
+                                            >
+                                                <Banknote size={12} />
+                                                <span>Pagar</span>
+                                            </button>
+                                        )}
+
+                                        {/* Botão de Confirmação (Técnico) */}
+                                        {canConfirmReceipt && (
+                                            <button 
+                                                onClick={() => handleConfirmReceipt(r)}
+                                                className="flex items-center space-x-1 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-[9px] font-black uppercase shadow-lg shadow-indigo-200 transition-all animate-pulse"
+                                            >
+                                                <CheckCircle2 size={12} />
+                                                <span>Confirmar Recebimento</span>
+                                            </button>
+                                        )}
+
+                                        {/* Botões de Edição/Exclusão (Restritos) */}
+                                        {canEditDelete && (
                                             <>
-                                                <button onClick={() => openEdit(r)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
-                                                    <Edit size={18} />
-                                                </button>
-                                                <button onClick={() => setConfirmingDeleteId(r.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Excluir">
-                                                    <Trash2 size={18} />
-                                                </button>
+                                                {confirmingDeleteId === r.id ? (
+                                                    <button onClick={() => { onDeleteReimbursement(r.id); setConfirmingDeleteId(null); }} className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded">Confirmar</button>
+                                                ) : (
+                                                    <>
+                                                        <button onClick={() => openEdit(r)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
+                                                            <Edit size={18} />
+                                                        </button>
+                                                        <button onClick={() => setConfirmingDeleteId(r.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Excluir">
+                                                            <Trash2 size={18} />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </>
                                         )}
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                        )})}
                     </React.Fragment>
                   ))
                 )}
