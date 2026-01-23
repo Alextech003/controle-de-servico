@@ -4,7 +4,7 @@ import {
   Plus, Search, Trash2, X, Save, 
   CalendarDays, ChevronLeft, ChevronRight,
   Eye, Receipt, Upload, Loader2, DollarSign, FileText,
-  Edit, Calculator, AlertCircle
+  Edit, Calculator, AlertCircle, Users, ArrowRight, ArrowLeft
 } from 'lucide-react';
 import { 
   Reimbursement, ReimbursementType, ReimbursementStatus, User, UserRole 
@@ -27,6 +27,9 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
+  // Estado para Admin/Master controlar qual técnico está vendo
+  const [viewingTechId, setViewingTechId] = useState<string | null>(null);
+
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -67,18 +70,33 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     });
   };
 
+  const isManager = currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN;
+
+  // Filtra reembolsos baseados no mês, ano e (se for admin) no técnico selecionado
   const filteredReimbursements = useMemo(() => {
     return reimbursements.filter(r => {
       const rDate = new Date(r.date + 'T12:00:00');
-      return rDate.getMonth() === selectedMonth && rDate.getFullYear() === selectedYear;
+      const matchesDate = rDate.getMonth() === selectedMonth && rDate.getFullYear() === selectedYear;
+      
+      if (isManager) {
+        // Se for gerente, só mostra se tiver selecionado um ID e bater com o ID
+        if (viewingTechId) {
+            return matchesDate && r.technicianId === viewingTechId;
+        }
+        // Se não tiver ID selecionado, mostra vazio ou tudo (aqui optamos por filtrar na UI principal)
+        return matchesDate;
+      }
+      
+      // Se for técnico, já vem filtrado do App.tsx, mas garantimos data
+      return matchesDate;
     });
-  }, [reimbursements, selectedMonth, selectedYear]);
+  }, [reimbursements, selectedMonth, selectedYear, viewingTechId, isManager]);
 
   // Cálculo do Total com Regra de 50% para Manutenção
+  // Calcula o total VISÍVEL na tela
   const totalValue = useMemo(() => {
     return filteredReimbursements.reduce((acc, r) => {
       if (r.type === ReimbursementType.MANUTENCAO_VEICULO) {
-        // Regra: Manutenção divide por 2
         return acc + (r.value / 2);
       }
       return acc + r.value;
@@ -97,16 +115,46 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     return groups;
   }, [filteredReimbursements]);
 
+  // --- LÓGICA PARA O PAINEL DE SELEÇÃO DE TÉCNICOS (ADMIN ONLY) ---
+  const techniciansSummary = useMemo(() => {
+    if (!isManager) return [];
+    
+    // Pega todos os usuários técnicos
+    const techs = users.filter(u => u.role === UserRole.TECHNICIAN);
+    
+    return techs.map(tech => {
+        // Calcula o total do mês para este técnico específico
+        const techMonthTotal = reimbursements
+            .filter(r => {
+                const rDate = new Date(r.date + 'T12:00:00');
+                return r.technicianId === tech.id && 
+                       rDate.getMonth() === selectedMonth && 
+                       rDate.getFullYear() === selectedYear;
+            })
+            .reduce((acc, r) => {
+                const val = r.type === ReimbursementType.MANUTENCAO_VEICULO ? r.value / 2 : r.value;
+                return acc + val;
+            }, 0);
+
+        const pendingCount = reimbursements.filter(r => r.technicianId === tech.id && r.status === ReimbursementStatus.PENDENTE && new Date(r.date + 'T12:00:00').getMonth() === selectedMonth).length;
+
+        return {
+            ...tech,
+            monthTotal: techMonthTotal,
+            pendingCount
+        };
+    });
+  }, [users, reimbursements, selectedMonth, selectedYear, isManager]);
+
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validação de Tamanho (Max 1MB para evitar erro no banco)
       if (file.size > 1024 * 1024) {
-        alert("O arquivo é muito grande (Máx 1MB). Por favor, comprima o PDF/Foto ou tire um print screen.");
+        alert("O arquivo é muito grande (Máx 1MB).");
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
-
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData({ ...formData, receiptUrl: reader.result as string });
@@ -115,23 +163,17 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     }
   };
 
-  const isPdf = (url: string) => {
-      return url.includes('application/pdf') || url.toLowerCase().endsWith('.pdf');
-  };
+  const isPdf = (url: string) => url.includes('application/pdf') || url.toLowerCase().endsWith('.pdf');
 
-  // Lógica para formatação de moeda automática
   const formatCurrencyValue = (value: number) => {
     if (value === undefined || value === null) return '0,00';
     return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let rawValue = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
+    let rawValue = e.target.value.replace(/\D/g, '');
     if (!rawValue) rawValue = '0';
-    
-    // Converte para float dividindo por 100 para ter as duas casas decimais
     const floatValue = parseInt(rawValue, 10) / 100;
-    
     setFormData({ ...formData, value: floatValue });
   };
 
@@ -146,18 +188,20 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
       alert("Preencha data, descrição e valor.");
       return;
     }
-
     setIsSaving(true);
     
-    // Se estiver editando usa o ID existente, senão cria um novo
     const idToUse = editingReimbursement ? editingReimbursement.id : (self.crypto.randomUUID ? self.crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36));
+
+    // Se for admin criando, usa o ID do técnico que está sendo visualizado. Se for o próprio técnico, usa o ID dele.
+    const targetTechId = isManager ? (viewingTechId || currentUser.id) : currentUser.id;
+    const targetTechName = users.find(u => u.id === targetTechId)?.name || currentUser.name;
 
     const reimbursementToSave: Reimbursement = {
         ...initialFormState,
         ...formData,
         id: idToUse,
-        technicianId: editingReimbursement ? editingReimbursement.technicianId : currentUser.id,
-        technicianName: editingReimbursement ? editingReimbursement.technicianName : currentUser.name
+        technicianId: editingReimbursement ? editingReimbursement.technicianId : targetTechId,
+        technicianName: editingReimbursement ? editingReimbursement.technicianName : targetTechName
     } as Reimbursement;
 
     await onSaveReimbursement(reimbursementToSave);
@@ -186,16 +230,104 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     }
   };
 
+  // --- RENDERIZAÇÃO ---
+
+  // 1. Visão de Seleção de Técnicos (Apenas Admin/Master quando nenhum técnico selecionado)
+  if (isManager && !viewingTechId) {
+    return (
+        <div className="flex h-full animate-in fade-in duration-500 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8 bg-slate-50/30">
+                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                    <div>
+                        <h1 className="text-2xl md:text-3xl font-black text-slate-800 uppercase tracking-tight">Gestão de Reembolsos</h1>
+                        <p className="text-slate-500 font-medium">Selecione um técnico para gerenciar as despesas</p>
+                    </div>
+                    <div className="flex items-center justify-between space-x-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                        <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-colors group">
+                            <ChevronLeft size={20} className="text-[#00AEEF] group-active:scale-90 transition-transform" />
+                        </button>
+                        <div className="px-3 text-center min-w-[120px] font-black uppercase text-xs text-slate-800">{months[selectedMonth]} {selectedYear}</div>
+                        <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-colors group">
+                            <ChevronRight size={20} className="text-[#00AEEF] group-active:scale-90 transition-transform" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {techniciansSummary.map((tech) => (
+                        <div 
+                            key={tech.id} 
+                            onClick={() => setViewingTechId(tech.id)}
+                            className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all cursor-pointer group relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <Receipt size={80} className="text-[#00AEEF]" />
+                            </div>
+
+                            <div className="flex items-center space-x-4 mb-6 relative z-10">
+                                <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 font-black text-lg uppercase group-hover:bg-[#00AEEF] group-hover:text-white transition-colors">
+                                    {tech.avatar ? <img src={tech.avatar} className="w-full h-full object-cover rounded-2xl" /> : tech.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-slate-800 uppercase tracking-tight">{tech.name}</h3>
+                                    <p className="text-xs text-slate-400 font-bold uppercase">Técnico</p>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-3 relative z-10">
+                                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Total Mês</span>
+                                    <span className="text-sm font-black text-slate-900">{tech.monthTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                </div>
+                                {tech.pendingCount > 0 && (
+                                    <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-xl">
+                                        <AlertCircle size={14} />
+                                        <span className="text-[10px] font-black uppercase">{tech.pendingCount} pendentes</span>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="mt-6 flex justify-end">
+                                <button className="w-10 h-10 rounded-full bg-[#0A192F] text-white flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <ArrowRight size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+  }
+
+  // 2. Visão Detalhada (Tabela) - Usada por Técnicos OU por Admins vendo um técnico específico
   return (
     <div className="flex h-full animate-in fade-in duration-500 overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8 bg-slate-50/30">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-800 uppercase tracking-tight">Reembolsos</h1>
-            <p className="text-slate-500 font-medium">Controle de despesas operacionais</p>
+          <div className="flex items-start md:items-center flex-col md:flex-row gap-4">
+            {isManager && viewingTechId && (
+                <button 
+                    onClick={() => setViewingTechId(null)}
+                    className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all"
+                    title="Voltar para lista de técnicos"
+                >
+                    <ArrowLeft size={20} />
+                </button>
+            )}
+            <div>
+                <h1 className="text-2xl md:text-3xl font-black text-slate-800 uppercase tracking-tight">
+                    {isManager && viewingTechId 
+                        ? `Despesas: ${users.find(u => u.id === viewingTechId)?.name}` 
+                        : 'Meus Reembolsos'
+                    }
+                </h1>
+                <p className="text-slate-500 font-medium">Controle de despesas operacionais</p>
+            </div>
           </div>
+
           <div className="flex flex-col md:flex-row md:items-center gap-3">
              <div className="flex items-center justify-between space-x-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
                 <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-colors group">
@@ -217,7 +349,9 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
         {/* Card de Total */}
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between">
            <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total a Reembolsar</p>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
+                  {isManager && viewingTechId ? 'Total deste Técnico' : 'Total a Reembolsar'}
+              </p>
               <h2 className="text-3xl font-black text-slate-900">
                  {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </h2>
