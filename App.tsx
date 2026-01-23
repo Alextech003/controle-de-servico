@@ -12,7 +12,7 @@ import MonthlyReminder from './components/MonthlyReminder';
 import ReimbursementIntro from './components/ReimbursementIntro';
 import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB, mapReimbursementFromDB, mapReimbursementToDB } from './lib/supabase';
 import { MOCK_USERS, MOCK_REIMBURSEMENTS } from './constants';
-import { Loader2, Menu } from 'lucide-react';
+import { Loader2, Menu, AlertTriangle, Database } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -47,13 +48,15 @@ const App: React.FC = () => {
       // Buscar Usuários
       const { data: usersData, error: usersError } = await supabase.from('users').select('*');
       
-      if (usersError && (usersError.code === 'PGRST301' || usersError.message?.includes('JWT') || usersError.message?.includes('API key'))) {
-          console.warn("Modo Offline/Demo Ativado: Chave Supabase inválida detectada.");
+      if (usersError && (usersError.code === 'PGRST301' || usersError.message?.includes('JWT') || usersError.message?.includes('API key') || usersError.message?.includes('Failed to fetch'))) {
+          console.warn("Modo Offline/Demo Ativado: Chave Supabase inválida ou erro de conexão.");
+          setIsDemoMode(true);
           setUsers(MOCK_USERS);
           setReimbursements(MOCK_REIMBURSEMENTS);
       } else if (usersError) {
           throw usersError;
       } else {
+        setIsDemoMode(false);
         if (!usersData || usersData.length === 0) {
             setUsers(MOCK_USERS);
         } else {
@@ -62,25 +65,34 @@ const App: React.FC = () => {
       }
 
       // Buscar Serviços
-      const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').order('date', { ascending: false });
-      if (!servicesError && servicesData) {
-          setServices(servicesData.map(mapServiceFromDB));
-      }
+      if (!isDemoMode) {
+          const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').order('date', { ascending: false });
+          if (!servicesError && servicesData) {
+              setServices(servicesData.map(mapServiceFromDB));
+          }
 
-      // Buscar Reembolsos
-      const { data: reimbData, error: reimbError } = await supabase.from('reimbursements').select('*').order('date', { ascending: false });
-      if (!reimbError && reimbData) {
-          setReimbursements(reimbData.map(mapReimbursementFromDB));
+          // Buscar Reembolsos
+          const { data: reimbData, error: reimbError } = await supabase.from('reimbursements').select('*').order('date', { ascending: false });
+          if (reimbError) {
+              console.error("Erro ao buscar reembolsos:", reimbError);
+              if (reimbError.code === '42P01') { 
+                console.warn("Tabela 'reimbursements' não encontrada.");
+                setReimbursements([]);
+              }
+          } else if (reimbData) {
+              setReimbursements(reimbData.map(mapReimbursementFromDB));
+          }
       } else {
-          // Fallback se a tabela não existir ainda
-          setReimbursements(MOCK_REIMBURSEMENTS);
+          // Se estiver em modo demo, zera os serviços para não confundir o usuário com dados falsos
+          // ou mantenha vazio para ele começar a preencher
+          setServices([]);
       }
       
       setDbError(null);
     } catch (error: any) {
       console.error("Erro ao conectar com banco:", error);
+      setIsDemoMode(true);
       setUsers(prev => prev.length > 0 ? prev : MOCK_USERS);
-      setReimbursements(prev => prev.length > 0 ? prev : MOCK_REIMBURSEMENTS);
     }
   };
 
@@ -99,6 +111,12 @@ const App: React.FC = () => {
   // --- CRUD Serviços ---
   const handleSaveService = async (service: Service) => {
     try {
+      if (isDemoMode) {
+          alert("ATENÇÃO: Você está em MODO DE TESTE. \n\nEsse serviço NÃO SERÁ SALVO de verdade porque a Chave API do Supabase ainda não foi configurada. \n\nAtualize a chave no arquivo 'lib/supabase.ts' para salvar permanentemente.");
+          setServices(prev => [service, ...prev]); 
+          return;
+      }
+
       const exists = services.find(s => s.id === service.id);
       const dbPayload = mapServiceToDB(service);
 
@@ -118,6 +136,8 @@ const App: React.FC = () => {
     const previousServices = [...services];
     setServices(prev => prev.filter(s => String(s.id) !== String(id)));
 
+    if (isDemoMode) return;
+
     try {
       const { error } = await supabase.from('services').delete().eq('id', id);
       if (error) throw error;
@@ -132,17 +152,48 @@ const App: React.FC = () => {
 
   // --- CRUD Reembolsos ---
   const handleSaveReimbursement = async (reimbursement: Reimbursement) => {
+    if (isDemoMode) {
+        alert("ATENÇÃO: Você está em MODO DE TESTE. \n\nEsse reembolso aparecerá na tela agora, mas se você recarregar a página, ele SUMIRÁ. \n\nConfigure a Chave API no código para salvar de verdade.");
+        setReimbursements(prev => [reimbursement, ...prev]);
+        return;
+    }
+
+    // 1. Atualização Otimista
+    setReimbursements(prev => [reimbursement, ...prev]);
+
     try {
-      setReimbursements(prev => [reimbursement, ...prev]);
       const dbPayload = mapReimbursementToDB(reimbursement);
-      await supabase.from('reimbursements').insert(dbPayload);
-    } catch (error) {
-      console.error("Salvo localmente apenas.", error);
+      
+      // Tenta inserir no banco
+      const { error } = await supabase.from('reimbursements').insert(dbPayload);
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      console.error("Erro ao salvar reembolso no banco:", error);
+      
+      // Reverte a atualização otimista em caso de erro
+      setReimbursements(prev => prev.filter(r => r.id !== reimbursement.id));
+      
+      let msg = "ERRO AO SALVAR:";
+      if (error.code === '42P01') {
+        msg = "ERRO CRÍTICO: A tabela 'reimbursements' NÃO EXISTE no seu Supabase.\nVocê precisa executar o comando SQL fornecido.";
+      } else if (error.code === '22P02') {
+        msg = "ERRO DE FORMATO: O banco esperava um UUID mas recebeu texto simples.";
+      } else if (error.message && error.message.includes('payload')) {
+        msg = "ARQUIVO MUITO GRANDE: O banco rejeitou o anexo. Tente uma foto menor ou sem foto.";
+      } else {
+        msg = `Erro desconhecido: ${error.message}`;
+      }
+      
+      alert(msg);
     }
   };
 
   const handleDeleteReimbursement = async (id: string) => {
      setReimbursements(prev => prev.filter(r => r.id !== id));
+     if (isDemoMode) return;
      try {
        await supabase.from('reimbursements').delete().eq('id', id);
      } catch (error) { console.error(error); }
@@ -150,6 +201,10 @@ const App: React.FC = () => {
 
   // --- CRUD Usuários ---
   const handleSaveUser = async (user: User) => {
+    if (isDemoMode) {
+        setUsers(prev => [...prev, user]);
+        return;
+    }
     try {
       const exists = users.find(u => u.id === user.id);
       const dbPayload = mapUserToDB(user);
@@ -174,7 +229,7 @@ const App: React.FC = () => {
   const handleDeleteUser = async (id: string) => {
     try {
       setUsers(prev => prev.filter(u => u.id !== id));
-      await supabase.from('users').delete().eq('id', id);
+      if (!isDemoMode) await supabase.from('users').delete().eq('id', id);
     } catch (error) {
       console.error("Excluído localmente apenas.", error);
     }
@@ -284,10 +339,21 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
       
+      {/* ALERTA DE MODO DEMO - FIXO NO TOPO */}
+      {isDemoMode && (
+         <div className="fixed top-0 left-0 right-0 z-[100] bg-rose-600 text-white px-4 py-3 text-center shadow-lg animate-in slide-in-from-top flex items-center justify-center">
+            <Database className="mr-2 animate-pulse" size={18} />
+            <div>
+                <p className="text-xs font-black uppercase tracking-widest">Modo Offline / Sem Conexão</p>
+                <p className="text-[10px] font-medium opacity-90">Os dados exibidos são apenas de teste. As alterações NÃO estão sendo salvas. Atualize sua chave API.</p>
+            </div>
+         </div>
+      )}
+
       {currentUser && <MonthlyReminder currentUser={currentUser} />}
       {currentUser && <ReimbursementIntro />}
 
-      <div className="md:hidden fixed top-0 left-0 right-0 h-20 bg-white border-b border-slate-100 z-40 flex items-center justify-between px-6 shadow-sm">
+      <div className={`md:hidden fixed left-0 right-0 h-20 bg-white border-b border-slate-100 z-40 flex items-center justify-between px-6 shadow-sm ${isDemoMode ? 'top-14' : 'top-0'}`}>
         <div className="flex items-center space-x-3">
           <Logo size={32} />
           <div className="flex flex-col">
@@ -320,7 +386,7 @@ const App: React.FC = () => {
         onClose={() => setIsMobileMenuOpen(false)}
       />
 
-      <main className="flex-1 overflow-y-auto pt-20 md:pt-0 transition-all duration-300">
+      <main className={`flex-1 overflow-y-auto pt-20 md:pt-0 transition-all duration-300 ${isDemoMode ? 'mt-14 md:mt-14' : ''}`}>
         {renderContent()}
       </main>
     </div>

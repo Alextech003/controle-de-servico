@@ -6,11 +6,13 @@ import { Service, User, ServiceType, Company, ServiceStatus, CancelledBy, UserRo
 // CONFIGURAÇÃO DO BANCO DE DADOS
 // =========================================================================
 
+// 1. A URL do seu projeto Supabase
 const SUPABASE_URL = 'https://ixlvpojlqtkrsklvigfw.supabase.co';
 
-// ⚠️ IMPORTANTE: SUBSTITUA O TEXTO ABAIXO PELA SUA CHAVE 'anon' 'public' DO SUPABASE
-const SUPABASE_KEY = 'sb_publishable_auyAV6NE0ut649mZoCaVVg_kLGEDhK0'; 
+// 2. A CHAVE API (Configurada e Pronta!)
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bHZwb2pscXRrcnNrbHZpZ2Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwODA5NTYsImV4cCI6MjA4MzY1Njk1Nn0.5QR_D93ZV9l9z619JP4HaJRin3AolfdmjqAVbqPO2j4'; 
 
+// Cria a conexão.
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // =========================================================================

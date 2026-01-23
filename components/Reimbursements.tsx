@@ -86,6 +86,13 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validação de Tamanho (Max 1MB para evitar erro no banco)
+      if (file.size > 1024 * 1024) {
+        alert("O arquivo é muito grande (Máx 1MB). Por favor, comprima o PDF/Foto ou tire um print screen.");
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData({ ...formData, receiptUrl: reader.result as string });
@@ -121,10 +128,14 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     }
 
     setIsSaving(true);
+    
+    // GERA UM UUID VÁLIDO PARA O BANCO DE DADOS
+    const newId = self.crypto.randomUUID ? self.crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+
     const newReimbursement: Reimbursement = {
         ...initialFormState,
         ...formData,
-        id: Math.random().toString(36).substring(2, 11),
+        id: newId,
         technicianId: currentUser.id,
         technicianName: currentUser.name
     } as Reimbursement;
@@ -317,7 +328,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                                     <span className="flex items-center"><Receipt size={18} className="mr-2" /> Foto Selecionada</span>
                                 )
                             ) : (
-                                <span className="flex items-center"><Upload size={18} className="mr-2" /> Foto ou PDF</span>
+                                <span className="flex items-center"><Upload size={18} className="mr-2" /> Foto ou PDF (Máx 1MB)</span>
                             )}
                         </div>
                         <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*,application/pdf" />
