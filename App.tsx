@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, UserRole, Service, ServiceStatus, Reimbursement } from './types';
 import Sidebar from './components/Sidebar';
@@ -152,20 +153,39 @@ const App: React.FC = () => {
 
   // --- CRUD Reembolsos ---
   const handleSaveReimbursement = async (reimbursement: Reimbursement) => {
+    // Verificar se é uma edição ou criação
+    const exists = reimbursements.find(r => r.id === reimbursement.id);
+
     if (isDemoMode) {
-        alert("ATENÇÃO: Você está em MODO DE TESTE. \n\nEsse reembolso aparecerá na tela agora, mas se você recarregar a página, ele SUMIRÁ. \n\nConfigure a Chave API no código para salvar de verdade.");
-        setReimbursements(prev => [reimbursement, ...prev]);
+        if (exists) {
+            setReimbursements(prev => prev.map(r => r.id === reimbursement.id ? reimbursement : r));
+        } else {
+            setReimbursements(prev => [reimbursement, ...prev]);
+        }
+        alert("Modo Demo: Salvo localmente.");
         return;
     }
 
-    // 1. Atualização Otimista
-    setReimbursements(prev => [reimbursement, ...prev]);
+    // Atualização Otimista
+    if (exists) {
+        setReimbursements(prev => prev.map(r => r.id === reimbursement.id ? reimbursement : r));
+    } else {
+        setReimbursements(prev => [reimbursement, ...prev]);
+    }
 
     try {
       const dbPayload = mapReimbursementToDB(reimbursement);
       
-      // Tenta inserir no banco
-      const { error } = await supabase.from('reimbursements').insert(dbPayload);
+      let error;
+      if (exists) {
+         // UPDATE
+         const { error: updateError } = await supabase.from('reimbursements').update(dbPayload).eq('id', reimbursement.id);
+         error = updateError;
+      } else {
+         // INSERT
+         const { error: insertError } = await supabase.from('reimbursements').insert(dbPayload);
+         error = insertError;
+      }
 
       if (error) {
         throw error;
@@ -173,21 +193,8 @@ const App: React.FC = () => {
     } catch (error: any) {
       console.error("Erro ao salvar reembolso no banco:", error);
       
-      // Reverte a atualização otimista em caso de erro
-      setReimbursements(prev => prev.filter(r => r.id !== reimbursement.id));
-      
-      let msg = "ERRO AO SALVAR:";
-      if (error.code === '42P01') {
-        msg = "ERRO CRÍTICO: A tabela 'reimbursements' NÃO EXISTE no seu Supabase.\nVocê precisa executar o comando SQL fornecido.";
-      } else if (error.code === '22P02') {
-        msg = "ERRO DE FORMATO: O banco esperava um UUID mas recebeu texto simples.";
-      } else if (error.message && error.message.includes('payload')) {
-        msg = "ARQUIVO MUITO GRANDE: O banco rejeitou o anexo. Tente uma foto menor ou sem foto.";
-      } else {
-        msg = `Erro desconhecido: ${error.message}`;
-      }
-      
-      alert(msg);
+      // Reverte em caso de erro (recuperar estado anterior seria o ideal, mas aqui vamos alertar)
+      alert("Erro ao salvar no banco de dados. Verifique sua conexão.");
     }
   };
 

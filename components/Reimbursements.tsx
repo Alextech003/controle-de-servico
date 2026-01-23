@@ -1,8 +1,10 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import { 
   Plus, Search, Trash2, X, Save, 
   CalendarDays, ChevronLeft, ChevronRight,
-  Eye, Receipt, Upload, Loader2, DollarSign, FileText
+  Eye, Receipt, Upload, Loader2, DollarSign, FileText,
+  Edit, Calculator, AlertCircle
 } from 'lucide-react';
 import { 
   Reimbursement, ReimbursementType, ReimbursementStatus, User, UserRole 
@@ -20,6 +22,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
   reimbursements, currentUser, users, onSaveReimbursement, onDeleteReimbursement
 }) => {
   const [showForm, setShowForm] = useState(false);
+  const [editingReimbursement, setEditingReimbursement] = useState<Reimbursement | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,6 +74,17 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     });
   }, [reimbursements, selectedMonth, selectedYear]);
 
+  // Cálculo do Total com Regra de 50% para Manutenção
+  const totalValue = useMemo(() => {
+    return filteredReimbursements.reduce((acc, r) => {
+      if (r.type === ReimbursementType.MANUTENCAO_VEICULO) {
+        // Regra: Manutenção divide por 2
+        return acc + (r.value / 2);
+      }
+      return acc + r.value;
+    }, 0);
+  }, [filteredReimbursements]);
+
   // Agrupamento
   const groupedReimbursements = useMemo(() => {
     const groups: Record<string, Reimbursement[]> = {};
@@ -121,6 +135,12 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
     setFormData({ ...formData, value: floatValue });
   };
 
+  const openEdit = (r: Reimbursement) => {
+      setEditingReimbursement(r);
+      setFormData(r);
+      setShowForm(true);
+  };
+
   const handleSave = async () => {
     if (!formData.date || !formData.description || !formData.value) {
       alert("Preencha data, descrição e valor.");
@@ -129,21 +149,22 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
 
     setIsSaving(true);
     
-    // GERA UM UUID VÁLIDO PARA O BANCO DE DADOS
-    const newId = self.crypto.randomUUID ? self.crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+    // Se estiver editando usa o ID existente, senão cria um novo
+    const idToUse = editingReimbursement ? editingReimbursement.id : (self.crypto.randomUUID ? self.crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36));
 
-    const newReimbursement: Reimbursement = {
+    const reimbursementToSave: Reimbursement = {
         ...initialFormState,
         ...formData,
-        id: newId,
-        technicianId: currentUser.id,
-        technicianName: currentUser.name
+        id: idToUse,
+        technicianId: editingReimbursement ? editingReimbursement.technicianId : currentUser.id,
+        technicianName: editingReimbursement ? editingReimbursement.technicianName : currentUser.name
     } as Reimbursement;
 
-    await onSaveReimbursement(newReimbursement);
+    await onSaveReimbursement(reimbursementToSave);
     setIsSaving(false);
     setShowForm(false);
     setFormData(initialFormState);
+    setEditingReimbursement(null);
   };
 
   const getTypeColor = (type: ReimbursementType) => {
@@ -151,6 +172,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
       case ReimbursementType.COMBUSTIVEL: return 'text-amber-600 bg-amber-50 border-amber-200';
       case ReimbursementType.PEDAGIO: return 'text-purple-600 bg-purple-50 border-purple-200';
       case ReimbursementType.ALIMENTACAO: return 'text-rose-600 bg-rose-50 border-rose-200';
+      case ReimbursementType.MANUTENCAO_VEICULO: return 'text-slate-700 bg-slate-100 border-slate-300';
       default: return 'text-slate-600 bg-slate-50 border-slate-200';
     }
   };
@@ -185,11 +207,24 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                 </button>
              </div>
              
-             <button onClick={() => { setFormData(initialFormState); setShowForm(true); }} className="px-6 py-3 bg-[#0A192F] text-white rounded-xl text-sm font-black uppercase shadow-xl shadow-blue-900/10 active:scale-95 transition-all flex items-center justify-center space-x-2">
+             <button onClick={() => { setEditingReimbursement(null); setFormData(initialFormState); setShowForm(true); }} className="px-6 py-3 bg-[#0A192F] text-white rounded-xl text-sm font-black uppercase shadow-xl shadow-blue-900/10 active:scale-95 transition-all flex items-center justify-center space-x-2">
                 <Plus size={20} className="text-[#00AEEF]" />
                 <span>Nova Despesa</span>
              </button>
           </div>
+        </div>
+
+        {/* Card de Total */}
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between">
+           <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total a Reembolsar</p>
+              <h2 className="text-3xl font-black text-slate-900">
+                 {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </h2>
+           </div>
+           <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-600">
+              <Calculator size={28} />
+           </div>
         </div>
 
         {/* Lista */}
@@ -240,8 +275,17 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-medium text-slate-600 truncate max-w-[200px]">{r.description}</td>
-                                <td className="px-6 py-4 text-xs font-black text-slate-900 whitespace-nowrap text-right">
-                                  {r.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex flex-col items-end">
+                                      <span className="text-xs font-black text-slate-900">
+                                        {r.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                      </span>
+                                      {r.type === ReimbursementType.MANUTENCAO_VEICULO && (
+                                        <span className="text-[9px] font-bold text-[#00AEEF] bg-blue-50 px-1.5 py-0.5 rounded mt-1">
+                                            Rateio 50% ({ (r.value/2).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}) })
+                                        </span>
+                                      )}
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 text-center">
                                     <span className={`px-2 py-1 rounded text-[9px] font-black uppercase ${getStatusColor(r.status)}`}>{r.status}</span>
@@ -260,13 +304,20 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                                     )}
                                 </td>
                                 <td className="px-6 py-4 text-center">
-                                    {confirmingDeleteId === r.id ? (
-                                        <button onClick={() => { onDeleteReimbursement(r.id); setConfirmingDeleteId(null); }} className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded">Confirmar</button>
-                                    ) : (
-                                        <button onClick={() => setConfirmingDeleteId(r.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
-                                            <Trash2 size={18} />
-                                        </button>
-                                    )}
+                                    <div className="flex items-center justify-center space-x-2">
+                                        {confirmingDeleteId === r.id ? (
+                                            <button onClick={() => { onDeleteReimbursement(r.id); setConfirmingDeleteId(null); }} className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded">Confirmar</button>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => openEdit(r)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
+                                                    <Edit size={18} />
+                                                </button>
+                                                <button onClick={() => setConfirmingDeleteId(r.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Excluir">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -284,7 +335,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A192F]/60 backdrop-blur-md p-4 overflow-y-auto">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-300 my-auto">
             <div className="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between bg-white z-10">
-              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Nova Solicitação</h3>
+              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{editingReimbursement ? 'Editar Despesa' : 'Nova Solicitação'}</h3>
               <button onClick={() => setShowForm(false)} className="p-2 text-slate-400 hover:text-rose-600 rounded-2xl"><X size={24} /></button>
             </div>
             
@@ -305,7 +356,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                         <input type="text" placeholder="Ex: Pedágio ida Itaguaí" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 placeholder:text-slate-300" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
                     </div>
                     <div>
-                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Valor (R$)</label>
+                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Valor Total da Nota (R$)</label>
                         <div className="relative">
                             <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input 
@@ -317,6 +368,12 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                               onChange={handleCurrencyChange} 
                             />
                         </div>
+                        {formData.type === ReimbursementType.MANUTENCAO_VEICULO && (
+                            <div className="mt-2 flex items-start space-x-2 text-[10px] text-slate-500 bg-slate-100 p-2 rounded-lg">
+                                <AlertCircle size={12} className="mt-0.5 text-blue-500" />
+                                <span>Manutenção de veículo é dividida 50/50. O valor efetivo do reembolso será <strong>{((formData.value || 0) / 2).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</strong>.</span>
+                            </div>
+                        )}
                     </div>
                     <div>
                         <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Comprovante</label>
@@ -338,7 +395,7 @@ const Reimbursements: React.FC<ReimbursementsProps> = ({
                 <div className="pt-6 flex justify-end">
                     <button onClick={handleSave} disabled={isSaving} className="px-12 py-4 bg-[#0A192F] text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl flex items-center justify-center space-x-2">
                         {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} className="text-[#00AEEF]" />}
-                        <span>{isSaving ? 'Salvando...' : 'Registrar'}</span>
+                        <span>{isSaving ? 'Salvando...' : (editingReimbursement ? 'Salvar Edição' : 'Registrar')}</span>
                     </button>
                 </div>
             </div>

@@ -34,6 +34,7 @@ export enum ReimbursementType {
   ESTACIONAMENTO = 'Estacionamento',
   ALIMENTACAO = 'Alimentação',
   MATERIAL = 'Material/Peças',
+  MANUTENCAO_VEICULO = 'Manutenção do Veículo',
   OUTROS = 'Outros'
 }
 
