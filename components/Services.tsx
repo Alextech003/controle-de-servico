@@ -1,10 +1,11 @@
+
 import React, { useState, useMemo } from 'react';
 import { 
   Plus, Search, FileText, Trash2, Edit, X, Save, 
   MessageSquare, Table as TableIcon,
   ArrowRight, CopyPlus, Loader2,
   Users as UsersIcon, Check, XCircle, ChevronLeft, ChevronRight,
-  MapPin, CalendarDays
+  MapPin, CalendarDays, Car
 } from 'lucide-react';
 import { 
   Service, ServiceStatus, ServiceType, Company, 
@@ -266,6 +267,7 @@ const Services: React.FC<ServicesProps> = ({
                   <th className="px-6 py-5 whitespace-nowrap">Bairro</th>
                   <th className="px-6 py-5 text-center whitespace-nowrap">Tipo</th>
                   <th className="px-6 py-5 text-center whitespace-nowrap">Empresa</th>
+                  <th className="px-6 py-5 text-center whitespace-nowrap">Veículo</th>
                   <th className="px-6 py-5 text-center whitespace-nowrap">Placa</th>
                   <th className="px-6 py-5 whitespace-nowrap text-right">Valor</th>
                   <th className="px-6 py-5 print:hidden text-center whitespace-nowrap">Ações</th>
@@ -274,14 +276,14 @@ const Services: React.FC<ServicesProps> = ({
               <tbody className="divide-y divide-slate-50">
                 {Object.keys(groupedServices).length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Nenhum registro encontrado em {months[selectedMonth]}</td>
+                    <td colSpan={9} className="px-6 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Nenhum registro encontrado em {months[selectedMonth]}</td>
                   </tr>
                 ) : (
                   Object.keys(groupedServices).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()).map(date => (
                     <React.Fragment key={date}>
                         {/* Linha Divisória de Data */}
                         <tr className="bg-slate-50/50">
-                            <td colSpan={8} className="px-6 py-3">
+                            <td colSpan={9} className="px-6 py-3">
                                 <div className="flex items-center w-full">
                                     <div className="h-px bg-blue-200 flex-1"></div>
                                     <div className="px-4 py-1.5 bg-white border border-blue-100 rounded-full flex items-center space-x-2 shadow-sm mx-4">
@@ -318,6 +320,12 @@ const Services: React.FC<ServicesProps> = ({
                                 <td className="px-6 py-4 text-center whitespace-nowrap">
                                     <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${getCompanyStyle(s.company)}`}>
                                         {s.company}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-center whitespace-nowrap">
+                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase text-slate-600 bg-slate-100 px-2 py-1 rounded">
+                                        <Car size={12} className="text-slate-400" />
+                                        {s.vehicle || '-'}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-center whitespace-nowrap">
