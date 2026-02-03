@@ -32,6 +32,7 @@ const Trackers: React.FC<TrackersProps> = ({
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingTracker, setEditingTracker] = useState<Tracker | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null); // Estado para confirmação
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [activeCompanyFilter, setActiveCompanyFilter] = useState<Company | 'ALL'>('ALL');
@@ -113,6 +114,13 @@ const Trackers: React.FC<TrackersProps> = ({
     setShowForm(false);
     setFormData(initialFormState);
     setEditingTracker(null);
+  };
+
+  const executeDelete = async () => {
+      if (confirmingDeleteId) {
+          await onDeleteTracker(confirmingDeleteId);
+          setConfirmingDeleteId(null);
+      }
   };
 
   const openEdit = (t: Tracker) => {
@@ -266,7 +274,11 @@ const Trackers: React.FC<TrackersProps> = ({
                                                             <button onClick={() => openEdit(t)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
                                                                 <Radio size={18} />
                                                             </button>
-                                                            <button onClick={() => onDeleteTracker(t.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Excluir">
+                                                            <button 
+                                                                onClick={() => setConfirmingDeleteId(t.id)} 
+                                                                className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" 
+                                                                title="Excluir"
+                                                            >
                                                                 <Trash2 size={18} />
                                                             </button>
                                                         </>
@@ -335,6 +347,25 @@ const Trackers: React.FC<TrackersProps> = ({
                     {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} className="text-[#00AEEF]" />}
                     <span>{isSaving ? 'Salvando...' : 'Salvar Equipamento'}</span>
                 </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmação de Exclusão */}
+      {confirmingDeleteId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A192F]/80 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-10 text-center">
+                <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Trash2 size={40} />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">Excluir Equipamento?</h3>
+                <p className="text-slate-500 text-sm mb-8">Esta ação removerá o rastreador do estoque permanentemente.</p>
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => setConfirmingDeleteId(null)} className="py-4 bg-slate-100 text-slate-600 font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-200 transition-colors">Cancelar</button>
+                    <button onClick={executeDelete} className="py-4 bg-red-600 text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-lg shadow-red-200 hover:bg-red-700 transition-colors">Excluir</button>
+                </div>
             </div>
           </div>
         </div>
