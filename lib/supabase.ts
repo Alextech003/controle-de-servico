@@ -116,9 +116,10 @@ export const mapTrackerToDB = (t: Partial<Tracker>) => ({
   date: t.date,
   model: t.model,
   imei: t.imei,
-  company: t.company, // Adicionado mapeamento de empresa
+  company: t.company, 
   status: t.status,
   technician_id: t.technicianId,
   technician_name: t.technicianName,
-  installation_date: t.installationDate
+  // Garante que se for undefined, envia null para o banco não reclamar ou ignorar errado
+  installation_date: t.installationDate || null 
 });

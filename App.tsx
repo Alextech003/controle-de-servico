@@ -85,7 +85,8 @@ const App: React.FC = () => {
           if (!trackersError && trackersData) {
               setTrackers(trackersData.map(mapTrackerFromDB));
           } else {
-             // Caso a tabela ainda não exista no Supabase
+             // Caso a tabela ainda não exista no Supabase ou erro de fetch
+             console.log('Tabela trackers vazia ou inexistente:', trackersError);
              setTrackers([]);
           }
       } 
@@ -113,62 +114,63 @@ const App: React.FC = () => {
 
   // --- CRUD Serviços & BAIXA DE ESTOQUE ---
   const handleSaveService = async (service: Service) => {
-    try {
-      if (isDemoMode) {
-          alert("Modo Demo: Serviço salvo localmente.");
-          setServices(prev => {
-              const exists = prev.find(s => s.id === service.id);
-              if (exists) return prev.map(s => s.id === service.id ? service : s);
-              return [service, ...prev];
-          });
-          
-          // Simula baixa de estoque no modo demo
-          if (service.imei) {
-             setTrackers(prev => prev.map(t => t.imei === service.imei ? { 
-                ...t, 
-                status: TrackerStatus.INSTALADO,
-                installationDate: service.date // Salva data de instalação
-             } : t));
-          }
-          return;
-      }
+    // Optimistic Update (Atualiza UI primeiro)
+    setServices(prev => {
+        const exists = prev.find(s => s.id === service.id);
+        if (exists) return prev.map(s => s.id === service.id ? service : s);
+        return [service, ...prev];
+    });
 
+    if (isDemoMode) {
+        // Simula baixa de estoque no modo demo
+        if (service.imei) {
+           setTrackers(prev => prev.map(t => t.imei === service.imei ? { 
+              ...t, 
+              status: TrackerStatus.INSTALADO,
+              installationDate: service.date 
+           } : t));
+        }
+        alert("Modo Demo: Serviço salvo localmente.");
+        return;
+    }
+
+    try {
       const exists = services.find(s => s.id === service.id);
       const dbPayload = mapServiceToDB(service);
 
-      // 1. Salva o Serviço
-      if (exists) {
-        setServices(prev => prev.map(s => s.id === service.id ? service : s));
-        await supabase.from('services').update(dbPayload).eq('id', service.id);
-      } else {
-        setServices(prev => [service, ...prev]);
-        await supabase.from('services').insert(dbPayload);
-      }
+      // 1. Salva o Serviço no Banco
+      const { error } = exists 
+        ? await supabase.from('services').update(dbPayload).eq('id', service.id)
+        : await supabase.from('services').insert(dbPayload);
+
+      if (error) throw error;
 
       // 2. Lógica de Baixa de Estoque Automática (Vincular Equipamento)
       if (service.imei) {
-         // Procura o rastreador pelo IMEI
          const tracker = trackers.find(t => t.imei === service.imei);
          
-         // Se encontrar e ele estiver disponível, atualiza para INSTALADO
          if (tracker && tracker.status === TrackerStatus.DISPONIVEL) {
              const updatedTracker: Tracker = { 
                ...tracker, 
                status: TrackerStatus.INSTALADO,
-               installationDate: service.date // Salva data de instalação 
+               installationDate: service.date 
              };
              
-             // Atualiza estado local
+             // Atualiza estado local dos rastreadores
              setTrackers(prev => prev.map(t => t.id === tracker.id ? updatedTracker : t));
              
              // Atualiza no banco
-             await supabase.from('trackers').update(mapTrackerToDB(updatedTracker)).eq('id', tracker.id);
-             console.log(`Baixa de estoque efetuada para IMEI ${service.imei}`);
+             const { error: trackerError } = await supabase.from('trackers').update(mapTrackerToDB(updatedTracker)).eq('id', tracker.id);
+             if (trackerError) console.error("Erro ao baixar estoque:", trackerError);
+             else console.log(`Baixa de estoque efetuada para IMEI ${service.imei}`);
          }
       }
 
-    } catch (error) {
-      console.error("Erro ao salvar serviço ou atualizar estoque:", error);
+    } catch (error: any) {
+      console.error("Erro ao salvar serviço:", error);
+      alert(`Erro ao salvar no banco de dados: ${error.message || error.details || 'Erro desconhecido'}`);
+      // Reverter estado local em caso de erro (opcional, mas recomendado)
+      fetchAllData();
     }
   };
 
@@ -189,71 +191,102 @@ const App: React.FC = () => {
 
   // --- CRUD Reembolsos ---
   const handleSaveReimbursement = async (reimbursement: Reimbursement) => {
-    const exists = reimbursements.find(r => r.id === reimbursement.id);
-    if (exists) {
-        setReimbursements(prev => prev.map(r => r.id === reimbursement.id ? reimbursement : r));
-    } else {
-        setReimbursements(prev => [reimbursement, ...prev]);
-    }
+    setReimbursements(prev => {
+        const exists = prev.find(r => r.id === reimbursement.id);
+        if (exists) return prev.map(r => r.id === reimbursement.id ? reimbursement : r);
+        return [reimbursement, ...prev];
+    });
 
     if (isDemoMode) return;
 
     try {
       const dbPayload = mapReimbursementToDB(reimbursement);
-      if (exists) {
-         await supabase.from('reimbursements').update(dbPayload).eq('id', reimbursement.id);
-      } else {
-         await supabase.from('reimbursements').insert(dbPayload);
-      }
-    } catch (error) { console.error(error); }
+      const exists = reimbursements.find(r => r.id === reimbursement.id);
+      
+      const { error } = exists 
+        ? await supabase.from('reimbursements').update(dbPayload).eq('id', reimbursement.id)
+        : await supabase.from('reimbursements').insert(dbPayload);
+
+      if (error) throw error;
+
+    } catch (error: any) { 
+        console.error(error);
+        alert(`Erro ao salvar reembolso: ${error.message}`);
+        fetchAllData(); // Reverte para dados do servidor
+    }
   };
 
   const handleDeleteReimbursement = async (id: string) => {
      setReimbursements(prev => prev.filter(r => r.id !== id));
      if (isDemoMode) return;
      try {
-       await supabase.from('reimbursements').delete().eq('id', id);
+       const { error } = await supabase.from('reimbursements').delete().eq('id', id);
+       if (error) throw error;
      } catch (error) { console.error(error); }
   };
 
   // --- CRUD Rastreadores (Estoque) ---
   const handleSaveTracker = async (tracker: Tracker) => {
-     const exists = trackers.find(t => t.id === tracker.id);
-     
-     if (exists) {
-        setTrackers(prev => prev.map(t => t.id === tracker.id ? tracker : t));
-     } else {
-        setTrackers(prev => [tracker, ...prev]);
+     // Atualização Otimista (Visual)
+     const previousTrackers = [...trackers];
+     setTrackers(prev => {
+        const exists = prev.find(t => t.id === tracker.id);
+        if (exists) return prev.map(t => t.id === tracker.id ? tracker : t);
+        return [tracker, ...prev];
+     });
+
+     if (isDemoMode) {
+        alert("Modo Demo: Rastreador salvo localmente.");
+        return;
      }
 
-     if (isDemoMode) return;
-
      try {
+        const exists = previousTrackers.find(t => t.id === tracker.id);
         const dbPayload = mapTrackerToDB(tracker);
-        if (exists) {
-            await supabase.from('trackers').update(dbPayload).eq('id', tracker.id);
-        } else {
-            await supabase.from('trackers').insert(dbPayload);
+        
+        const { error } = exists 
+            ? await supabase.from('trackers').update(dbPayload).eq('id', tracker.id)
+            : await supabase.from('trackers').insert(dbPayload);
+
+        if (error) {
+            console.error("Erro Supabase:", error);
+            throw error;
         }
-     } catch (error) { console.error(error); }
+     } catch (error: any) { 
+         console.error("Erro ao salvar rastreador:", error);
+         // Alerta amigável para erro de coluna inexistente
+         if (error.message?.includes('column') && error.message?.includes('does not exist')) {
+            alert(`ERRO DE BANCO DE DADOS: A tabela 'trackers' não possui as colunas novas (company, installation_date). É necessário atualizar o banco de dados.`);
+         } else {
+            alert(`Erro ao salvar rastreador: ${error.message || JSON.stringify(error)}`);
+         }
+         setTrackers(previousTrackers); // Reverte a alteração visual
+     }
   };
 
   const handleDeleteTracker = async (id: string) => {
+      const previousTrackers = [...trackers];
       setTrackers(prev => prev.filter(t => t.id !== id));
+      
       if (isDemoMode) return;
+      
       try {
-          await supabase.from('trackers').delete().eq('id', id);
-      } catch (error) { console.error(error); }
+          const { error } = await supabase.from('trackers').delete().eq('id', id);
+          if (error) throw error;
+      } catch (error: any) { 
+          console.error(error);
+          alert(`Erro ao excluir rastreador: ${error.message}`);
+          setTrackers(previousTrackers);
+      }
   };
 
   // --- CRUD Usuários ---
   const handleSaveUser = async (user: User) => {
-    const exists = users.find(u => u.id === user.id);
-    if (exists) {
-        setUsers(prev => prev.map(u => u.id === user.id ? user : u));
-    } else {
-        setUsers(prev => [...prev, user]);
-    }
+    setUsers(prev => {
+        const exists = prev.find(u => u.id === user.id);
+        if (exists) return prev.map(u => u.id === user.id ? user : u);
+        return [...prev, user];
+    });
     
     if (currentUser && currentUser.id === user.id) {
         setCurrentUser(user);
@@ -263,9 +296,16 @@ const App: React.FC = () => {
     if (isDemoMode) return;
     try {
        const dbPayload = mapUserToDB(user);
-       if (exists) await supabase.from('users').update(dbPayload).eq('id', user.id);
-       else await supabase.from('users').insert(dbPayload);
-    } catch(e) { console.error(e); }
+       const exists = users.find(u => u.id === user.id);
+       const { error } = exists 
+            ? await supabase.from('users').update(dbPayload).eq('id', user.id)
+            : await supabase.from('users').insert(dbPayload);
+       
+       if (error) throw error;
+    } catch(e: any) { 
+        console.error(e);
+        alert(`Erro ao salvar usuário: ${e.message}`);
+    }
   };
 
   const handleDeleteUser = async (id: string) => {
