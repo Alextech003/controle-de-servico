@@ -129,15 +129,15 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
         </div>
         <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
              <div className="text-center">
-                 <p className="text-[9px] font-black text-purple-500 uppercase">Clube</p>
+                 <p className="text-[9px] font-black text-purple-500 uppercase">AIROCLUBE</p>
                  <p className="text-lg font-black text-slate-800">{byCompany[Company.AIROCLUBE]}</p>
              </div>
              <div className="text-center border-l border-r border-slate-100">
-                 <p className="text-[9px] font-black text-orange-500 uppercase">Tracker</p>
+                 <p className="text-[9px] font-black text-orange-500 uppercase">AIROTRACKER</p>
                  <p className="text-lg font-black text-slate-800">{byCompany[Company.AIROTRACKER]}</p>
              </div>
              <div className="text-center">
-                 <p className="text-[9px] font-black text-cyan-500 uppercase">Cartrac</p>
+                 <p className="text-[9px] font-black text-cyan-500 uppercase">CARTRAC</p>
                  <p className="text-lg font-black text-slate-800">{byCompany[Company.CARTRAC]}</p>
              </div>
         </div>
