@@ -6,7 +6,7 @@ import {
   ArrowRight, CopyPlus, Loader2,
   Users as UsersIcon, Check, XCircle, ChevronLeft, ChevronRight,
   MapPin, CalendarDays, Car, Barcode, Box, DollarSign,
-  ScanBarcode, Cpu, RefreshCw, LogOut as LogOutIcon
+  ScanBarcode, Cpu, RefreshCw, LogOut as LogOutIcon, ArrowDown
 } from 'lucide-react';
 import { 
   Service, ServiceStatus, ServiceType, Company, 
@@ -45,7 +45,9 @@ const Services: React.FC<ServicesProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [viewingReason, setViewingReason] = useState<Service | null>(null);
-  const [viewingTrackerInfo, setViewingTrackerInfo] = useState<Partial<Tracker> | null>(null);
+  
+  // Alterado: Agora armazena o SERVIÇO inteiro para ver Instalado E Retirado
+  const [viewingServiceEquipment, setViewingServiceEquipment] = useState<Service | null>(null);
   
   // Controle do Autocomplete do IMEI
   const [showImeiSuggestions, setShowImeiSuggestions] = useState(false);
@@ -252,15 +254,9 @@ const Services: React.FC<ServicesProps> = ({
     setConfirmingDeleteId(null);
   };
 
-  const openTrackerInfo = (e: React.MouseEvent, imei: string) => {
+  const openEquipmentModal = (e: React.MouseEvent, service: Service) => {
       e.stopPropagation();
-      const tracker = trackers.find(t => t.imei === imei);
-      if (tracker) {
-          setViewingTrackerInfo(tracker);
-      } else {
-          // Caso não ache no estoque (foi excluído ou digitado manual), mostra apenas o IMEI
-          setViewingTrackerInfo({ imei: imei, model: 'Não identificado', status: TrackerStatus.DISPONIVEL });
-      }
+      setViewingServiceEquipment(service);
   };
 
   const isAdmin = currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN;
@@ -413,12 +409,12 @@ const Services: React.FC<ServicesProps> = ({
                                     <div className="flex items-center justify-center space-x-1">
                                     {s.status === ServiceStatus.CANCELADO && <button onClick={() => setViewingReason(s)} className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"><MessageSquare size={14} /></button>}
                                     
-                                    {/* Botão de Ver Equipamento (Se tiver IMEI) */}
-                                    {s.imei && (
+                                    {/* Botão de Ver Equipamento (Instalação, Troca ou Retirada) */}
+                                    {(s.imei || s.removedImei) && (
                                         <button 
-                                            onClick={(e) => openTrackerInfo(e, s.imei!)}
+                                            onClick={(e) => openEquipmentModal(e, s)}
                                             className="p-1.5 text-slate-300 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
-                                            title="Ver Equipamento Instalado"
+                                            title="Ver Equipamentos (Instalado/Retirado)"
                                         >
                                             <ScanBarcode size={14} />
                                         </button>
@@ -699,33 +695,96 @@ const Services: React.FC<ServicesProps> = ({
         </div>
       )}
 
-      {/* Modal de Detalhes do Equipamento */}
-      {viewingTrackerInfo && (
+      {/* Modal de Detalhes do Equipamento (INSTALADO, RETIRADO ou TROCA) */}
+      {viewingServiceEquipment && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0A192F]/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-300">
-              <div className="p-8 text-center space-y-6">
-                 <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                    <Cpu size={32} />
-                 </div>
-                 <div>
-                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-1">Equipamento Instalado</h3>
-                    <p className="text-xs text-slate-400 font-bold uppercase mb-4">Detalhes do Rastreador</p>
-                    
-                    <div className="space-y-3">
-                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Modelo</p>
-                            <p className="text-sm font-black text-slate-800 uppercase">{viewingTrackerInfo.model || 'N/A'}</p>
-                        </div>
-                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">IMEI</p>
-                            <div className="flex items-center justify-center gap-2 text-slate-800">
-                                <Barcode size={14} />
-                                <p className="text-sm font-black font-mono">{viewingTrackerInfo.imei}</p>
-                            </div>
-                        </div>
+           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-300">
+              <div className="p-8 space-y-6">
+                 
+                 {/* Header */}
+                 <div className="text-center">
+                    <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto shadow-sm mb-4">
+                        <Cpu size={32} />
                     </div>
+                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Equipamentos do Serviço</h3>
+                    <p className="text-xs text-slate-400 font-bold uppercase">Detalhes da movimentação</p>
                  </div>
-                 <button onClick={() => setViewingTrackerInfo(null)} className="w-full py-4 bg-purple-600 text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200">
+
+                 <div className="space-y-4">
+                    
+                    {/* SEÇÃO DE EQUIPAMENTO INSTALADO */}
+                    {viewingServiceEquipment.imei && (
+                        <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-4 relative overflow-hidden">
+                           <div className="absolute right-0 top-0 p-2 opacity-10">
+                              <Check size={60} className="text-emerald-600" />
+                           </div>
+                           <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3 flex items-center">
+                              <Check size={12} className="mr-1" /> Equipamento Instalado
+                           </p>
+                           <div className="space-y-2 relative z-10">
+                                <div className="bg-white/60 p-2 rounded-xl border border-emerald-100/50 flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-emerald-800 uppercase">Modelo</span>
+                                    {/* Busca o modelo no array de trackers se possível, senão mostra 'N/A' ou tenta inferir */}
+                                    <span className="text-xs font-black text-slate-800 uppercase">
+                                        {trackers.find(t => t.imei === viewingServiceEquipment.imei)?.model || 'Não Identificado'}
+                                    </span>
+                                </div>
+                                <div className="bg-white/60 p-2 rounded-xl border border-emerald-100/50 flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-emerald-800 uppercase">IMEI</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <Barcode size={12} className="text-emerald-600" />
+                                        <span className="text-xs font-black font-mono text-slate-800">{viewingServiceEquipment.imei}</span>
+                                    </div>
+                                </div>
+                           </div>
+                        </div>
+                    )}
+
+                    {/* SETA SE HOUVER TROCA */}
+                    {viewingServiceEquipment.imei && viewingServiceEquipment.removedImei && (
+                        <div className="flex justify-center text-slate-300">
+                            <ArrowDown size={20} />
+                        </div>
+                    )}
+
+                    {/* SEÇÃO DE EQUIPAMENTO RETIRADO */}
+                    {viewingServiceEquipment.removedImei && (
+                        <div className="bg-rose-50 rounded-2xl border border-rose-100 p-4 relative overflow-hidden">
+                           <div className="absolute right-0 top-0 p-2 opacity-10">
+                              <LogOutIcon size={60} className="text-rose-600" />
+                           </div>
+                           <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-3 flex items-center">
+                              <LogOutIcon size={12} className="mr-1" /> Equipamento Retirado
+                           </p>
+                           <div className="space-y-2 relative z-10">
+                                <div className="bg-white/60 p-2 rounded-xl border border-rose-100/50 flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-rose-800 uppercase">Modelo</span>
+                                    <span className="text-xs font-black text-slate-800 uppercase">
+                                        {viewingServiceEquipment.removedModel || 'Não Info.'}
+                                    </span>
+                                </div>
+                                <div className="bg-white/60 p-2 rounded-xl border border-rose-100/50 flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-rose-800 uppercase">IMEI</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <Barcode size={12} className="text-rose-600" />
+                                        <span className="text-xs font-black font-mono text-slate-800 line-through decoration-rose-400">
+                                            {viewingServiceEquipment.removedImei}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="bg-white/60 p-2 rounded-xl border border-rose-100/50 flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-rose-800 uppercase">Empresa</span>
+                                    <span className="text-[10px] font-black text-slate-800 uppercase">
+                                        {viewingServiceEquipment.removedCompany || 'N/A'}
+                                    </span>
+                                </div>
+                           </div>
+                        </div>
+                    )}
+
+                 </div>
+
+                 <button onClick={() => setViewingServiceEquipment(null)} className="w-full py-4 bg-purple-600 text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200">
                     Fechar
                  </button>
               </div>
