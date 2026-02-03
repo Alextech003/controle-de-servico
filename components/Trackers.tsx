@@ -3,7 +3,8 @@ import React, { useState, useMemo } from 'react';
 import { 
   Plus, Search, Trash2, X, Save, 
   Radio, Barcode, CalendarDays,
-  Loader2, ArrowRight, Package
+  Loader2, ArrowRight, Package,
+  CheckCircle2, Clock, Truck
 } from 'lucide-react';
 import { 
   Tracker, TrackerStatus, User, UserRole, Company 
@@ -66,16 +67,17 @@ const Trackers: React.FC<TrackersProps> = ({
     // 1. Filtra por Aba (Estoque vs Retirados)
     if (activeTab === 'ESTOQUE') {
         // Mostra Disponíveis e Instalados (Todo o histórico ativo)
-        list = list.filter(t => t.status !== TrackerStatus.DEVOLUCAO);
+        list = list.filter(t => t.status !== TrackerStatus.DEVOLUCAO && t.status !== TrackerStatus.EM_CONFERENCIA);
     } else {
-        // Mostra apenas Retirados aguardando devolução
-        list = list.filter(t => t.status === TrackerStatus.DEVOLUCAO);
+        // Mostra Retirados E os que estão aguardando confirmação
+        list = list.filter(t => t.status === TrackerStatus.DEVOLUCAO || t.status === TrackerStatus.EM_CONFERENCIA);
     }
     
-    // 2. Filtra por Técnico
+    // 2. Filtra por Técnico (Se for Master visualizando todos ou específico)
     if (isManager && viewingTechId) {
        list = list.filter(t => t.technicianId === viewingTechId);
     } else if (!isManager) {
+       // Técnico só vê o dele
        list = list.filter(t => t.technicianId === currentUser.id);
     }
 
@@ -157,6 +159,46 @@ const Trackers: React.FC<TrackersProps> = ({
     setEditingTracker(null);
   };
 
+  // --- AÇÕES DE DEVOLUÇÃO ---
+
+  // 1. TÉCNICO: Marcar como Entregue
+  const handleDeliver = async (tracker: Tracker) => {
+    const confirm = window.confirm(`Confirmar que você entregou o rastreador ${tracker.imei} na central?`);
+    if (!confirm) return;
+
+    await onSaveTracker({
+        ...tracker,
+        status: TrackerStatus.EM_CONFERENCIA
+    });
+  };
+
+  // 2. MASTER: Confirmar Recebimento (Volta para Estoque Disponível)
+  const handleConfirmReturn = async (tracker: Tracker) => {
+    const confirm = window.confirm(`Confirmar o recebimento do rastreador ${tracker.imei}?\n\nIsso moverá o item para o estoque DISPONÍVEL com a data de hoje.`);
+    if (!confirm) return;
+
+    // Atualiza para Disponível e Data de Hoje (Nova entrada no estoque)
+    await onSaveTracker({
+        ...tracker,
+        status: TrackerStatus.DISPONIVEL,
+        date: new Date().toISOString().split('T')[0], // Data da confirmação vira a nova data de estoque
+        installationDate: undefined
+    });
+  };
+
+  // 3. MASTER: Confirmar Recebimento COM DEFEITO
+  const handleConfirmDefect = async (tracker: Tracker) => {
+    const confirm = window.confirm(`O equipamento ${tracker.imei} foi devolvido com DEFEITO?\n\nEle será marcado como DEFEITO no estoque.`);
+    if (!confirm) return;
+
+    await onSaveTracker({
+        ...tracker,
+        status: TrackerStatus.DEFEITO,
+        date: new Date().toISOString().split('T')[0],
+        installationDate: undefined
+    });
+  };
+
   const executeDelete = async () => {
       if (confirmingDeleteId) {
           await onDeleteTracker(confirmingDeleteId);
@@ -176,6 +218,7 @@ const Trackers: React.FC<TrackersProps> = ({
       case TrackerStatus.INSTALADO: return 'text-blue-600 bg-blue-50 border-blue-200';
       case TrackerStatus.DEFEITO: return 'text-rose-600 bg-rose-50 border-rose-200';
       case TrackerStatus.DEVOLUCAO: return 'text-amber-600 bg-amber-50 border-amber-200';
+      case TrackerStatus.EM_CONFERENCIA: return 'text-purple-600 bg-purple-50 border-purple-200';
       default: return 'text-slate-600 bg-slate-50 border-slate-200';
     }
   };
@@ -238,7 +281,7 @@ const Trackers: React.FC<TrackersProps> = ({
                     className={`flex items-center px-6 py-2.5 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'RETIRADOS' ? 'bg-amber-100 text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                  >
                     <Package size={16} className="mr-2" />
-                    Retirados / Devolução
+                    Devolução
                  </button>
             </div>
 
@@ -330,6 +373,46 @@ const Trackers: React.FC<TrackersProps> = ({
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center space-x-2">
+                                                    
+                                                    {/* BOTÃO PARA TÉCNICO: Marcar como Entregue */}
+                                                    {t.status === TrackerStatus.DEVOLUCAO && (
+                                                        <button 
+                                                            onClick={() => handleDeliver(t)}
+                                                            className="flex items-center space-x-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase shadow-lg shadow-blue-200 transition-all mr-2"
+                                                        >
+                                                            <Truck size={12} />
+                                                            <span>Entregar</span>
+                                                        </button>
+                                                    )}
+
+                                                    {/* BOTÃO PARA MASTER: Confirmar Recebimento */}
+                                                    {t.status === TrackerStatus.EM_CONFERENCIA && isManager && (
+                                                        <>
+                                                            <button 
+                                                                onClick={() => handleConfirmReturn(t)}
+                                                                className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase shadow-lg shadow-emerald-200 transition-all mr-1"
+                                                                title="Confirmar devolução para Estoque Disponível"
+                                                            >
+                                                                <CheckCircle2 size={12} />
+                                                                <span>Confirmar</span>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleConfirmDefect(t)}
+                                                                className="p-1.5 bg-rose-100 text-rose-600 rounded-lg hover:bg-rose-200 transition-colors mr-2"
+                                                                title="Marcar como DEFEITO"
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        </>
+                                                    )}
+
+                                                    {/* BOTÃO PARA MASTER: Ver Aguardando (Sem ação) */}
+                                                    {t.status === TrackerStatus.EM_CONFERENCIA && !isManager && (
+                                                         <span className="flex items-center text-purple-500 text-[9px] font-black uppercase mr-2">
+                                                            <Clock size={12} className="mr-1" /> Aguardando Confirmação
+                                                         </span>
+                                                    )}
+
                                                     <button onClick={() => openEdit(t)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
                                                         <Radio size={18} />
                                                     </button>
@@ -344,7 +427,7 @@ const Trackers: React.FC<TrackersProps> = ({
                                                             <Trash2 size={18} />
                                                         </button>
                                                     ) : (
-                                                       <span className="text-[9px] text-slate-300 font-bold uppercase ml-2 select-none">Em Uso</span>
+                                                       null
                                                     )}
                                                 </div>
                                             </td>
@@ -430,6 +513,7 @@ const Trackers: React.FC<TrackersProps> = ({
                                 formData.status === TrackerStatus.DISPONIVEL ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
                                 formData.status === TrackerStatus.INSTALADO ? 'bg-blue-50 border-blue-100 text-blue-700' :
                                 formData.status === TrackerStatus.DEVOLUCAO ? 'bg-amber-50 border-amber-100 text-amber-700' :
+                                formData.status === TrackerStatus.EM_CONFERENCIA ? 'bg-purple-50 border-purple-100 text-purple-700' :
                                 'bg-rose-50 border-rose-100 text-rose-700'
                             }`}
                             value={formData.status}
@@ -438,6 +522,7 @@ const Trackers: React.FC<TrackersProps> = ({
                             <option value={TrackerStatus.DISPONIVEL}>DISPONÍVEL</option>
                             <option value={TrackerStatus.INSTALADO}>INSTALADO (EM USO)</option>
                             <option value={TrackerStatus.DEVOLUCAO}>AGUARDANDO DEVOLUÇÃO</option>
+                            <option value={TrackerStatus.EM_CONFERENCIA}>AGUARDANDO CONFIRMAÇÃO</option>
                             <option value={TrackerStatus.DEFEITO}>DEFEITO</option>
                         </select>
                         <p className="text-[9px] text-slate-400 mt-1 font-medium ml-1">
