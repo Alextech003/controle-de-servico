@@ -17,6 +17,16 @@ interface TrackersProps {
   onDeleteTracker: (id: string) => Promise<void>;
 }
 
+// Lista de modelos pré-definidos
+const TRACKER_MODELS = [
+  "Suntech 310",
+  "Suntech 8310",
+  "Nonus N4",
+  "Genérico J16",
+  "Lumiar LT32",
+  "Lumiar LT32-PRO"
+];
+
 const Trackers: React.FC<TrackersProps> = ({ 
   trackers, currentUser, users, onSaveTracker, onDeleteTracker
 }) => {
@@ -301,7 +311,16 @@ const Trackers: React.FC<TrackersProps> = ({
                     </div>
                     <div className="col-span-2">
                         <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Modelo</label>
-                        <input type="text" placeholder="Ex: FMB920" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900 uppercase" value={formData.model} onChange={(e) => setFormData({...formData, model: e.target.value})} />
+                        <select 
+                            className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900 uppercase"
+                            value={formData.model} 
+                            onChange={(e) => setFormData({...formData, model: e.target.value})}
+                        >
+                            <option value="">SELECIONE O MODELO...</option>
+                            {TRACKER_MODELS.map((model) => (
+                                <option key={model} value={model}>{model.toUpperCase()}</option>
+                            ))}
+                        </select>
                     </div>
                     <div className="col-span-2">
                         <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">IMEI</label>
