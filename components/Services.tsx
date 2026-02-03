@@ -6,7 +6,7 @@ import {
   ArrowRight, CopyPlus, Loader2,
   Users as UsersIcon, Check, XCircle, ChevronLeft, ChevronRight,
   MapPin, CalendarDays, Car, Barcode, Box, DollarSign,
-  ScanBarcode, Cpu
+  ScanBarcode, Cpu, RefreshCw, LogOut as LogOutIcon
 } from 'lucide-react';
 import { 
   Service, ServiceStatus, ServiceType, Company, 
@@ -24,6 +24,19 @@ interface ServicesProps {
   onFilterByTech: (id: string) => void;
   trackers?: Tracker[];
 }
+
+const TRACKER_MODELS = [
+  "Suntech 310",
+  "Suntech 8310",
+  "Nonus N4",
+  "Genérico J16",
+  "Lumiar LT32",
+  "Lumiar LT32-PRO",
+  "Queclink GV55",
+  "Queclink GV57",
+  "NT20",
+  "TR05"
+];
 
 const Services: React.FC<ServicesProps> = ({ 
   services, currentUser, users, onSaveService, onDeleteService, 
@@ -84,7 +97,11 @@ const Services: React.FC<ServicesProps> = ({
     plate: '',
     cancellationReason: '',
     cancelledBy: undefined,
-    imei: ''
+    imei: '',
+    hasExchange: false,
+    removedImei: '',
+    removedModel: '',
+    removedCompany: Company.AIROCLUBE
   };
 
   const [formData, setFormData] = useState<Partial<Service>>(initialFormState);
@@ -207,7 +224,10 @@ const Services: React.FC<ServicesProps> = ({
         ...prev,
         vehicle: '', 
         plate: '',
-        imei: ''    
+        imei: '',
+        hasExchange: false,
+        removedImei: '',
+        removedModel: ''
       }));
       setEditingService(null); 
     } else { 
@@ -245,6 +265,9 @@ const Services: React.FC<ServicesProps> = ({
 
   const isAdmin = currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN;
   const canEdit = currentUser.role !== UserRole.ADMIN;
+
+  // Renderização condicional dos campos de retirada
+  const shouldShowRemovalFields = formData.type === ServiceType.RETIRADA || (formData.type === ServiceType.MANUTENCAO && formData.hasExchange);
 
   return (
     <div className="flex h-full animate-in fade-in duration-500 overflow-hidden">
@@ -466,49 +489,6 @@ const Services: React.FC<ServicesProps> = ({
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Placa *</label>
                   <input type="text" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-[#00AEEF] text-slate-900 font-black uppercase" value={formData.plate || ''} onChange={(e) => setFormData({...formData, plate: e.target.value.toUpperCase()})} />
                 </div>
-                <div className="relative">
-                  <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">IMEI Equipamento</label>
-                  <div className="relative z-20">
-                     <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                     <input 
-                        type="text" 
-                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-[#00AEEF] text-slate-900 font-black" 
-                        placeholder="Digite o IMEI..." 
-                        value={formData.imei || ''} 
-                        onChange={(e) => {
-                           setFormData({...formData, imei: e.target.value.replace(/\D/g, '')});
-                           setShowImeiSuggestions(true);
-                        }} 
-                        onFocus={() => setShowImeiSuggestions(true)}
-                     />
-                     
-                     {/* DROPDOWN DE SUGESTÕES DE ESTOQUE */}
-                     {showImeiSuggestions && suggestedTrackers.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
-                           <div className="px-4 py-2 bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                              Estoque Disponível
-                           </div>
-                           {suggestedTrackers.map((tracker) => (
-                              <button
-                                 key={tracker.id}
-                                 onClick={() => handleSelectImei(tracker)}
-                                 className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center justify-between group border-b border-slate-50 last:border-0"
-                              >
-                                 <div className="flex items-center space-x-3">
-                                    <Box size={16} className="text-slate-400 group-hover:text-[#00AEEF]" />
-                                    <div>
-                                       <p className="text-xs font-black text-slate-700 group-hover:text-[#00AEEF]">{tracker.imei}</p>
-                                       <p className="text-[10px] font-bold text-slate-400 uppercase">{tracker.model}</p>
-                                    </div>
-                                 </div>
-                                 <ArrowRight size={14} className="text-slate-300 group-hover:text-[#00AEEF]" />
-                              </button>
-                           ))}
-                        </div>
-                     )}
-                  </div>
-                  {formData.imei && <p className="text-[9px] text-blue-500 mt-1 ml-1 font-bold">O equipamento será baixado do estoque automaticamente.</p>}
-                </div>
                 <div>
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Valor do Serviço R$ *</label>
                   <div className="relative">
@@ -541,6 +521,127 @@ const Services: React.FC<ServicesProps> = ({
                     <option value={ServiceStatus.CANCELADO}>CANCELADO</option>
                   </select>
                 </div>
+
+                {/* --- LÓGICA DE INSTALAÇÃO (IMEI) --- */}
+                {(formData.type === ServiceType.INSTALACAO || (formData.type === ServiceType.MANUTENCAO && formData.hasExchange)) && (
+                    <div className="relative">
+                      <label className="block text-xs font-black text-emerald-600 uppercase mb-3 ml-1">
+                          {formData.type === ServiceType.MANUTENCAO ? 'NOVO Equipamento Instalado' : 'IMEI Equipamento Instalado'}
+                      </label>
+                      <div className="relative z-20">
+                         <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                         <input 
+                            type="text" 
+                            className="w-full pl-12 pr-4 py-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl outline-none focus:border-emerald-500 text-slate-900 font-black" 
+                            placeholder="IMEI a instalar..." 
+                            value={formData.imei || ''} 
+                            onChange={(e) => {
+                               setFormData({...formData, imei: e.target.value.replace(/\D/g, '')});
+                               setShowImeiSuggestions(true);
+                            }} 
+                            onFocus={() => setShowImeiSuggestions(true)}
+                         />
+                         
+                         {showImeiSuggestions && suggestedTrackers.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                               <div className="px-4 py-2 bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                  Estoque Disponível
+                               </div>
+                               {suggestedTrackers.map((tracker) => (
+                                  <button
+                                     key={tracker.id}
+                                     onClick={() => handleSelectImei(tracker)}
+                                     className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center justify-between group border-b border-slate-50 last:border-0"
+                                  >
+                                     <div className="flex items-center space-x-3">
+                                        <Box size={16} className="text-slate-400 group-hover:text-[#00AEEF]" />
+                                        <div>
+                                           <p className="text-xs font-black text-slate-700 group-hover:text-[#00AEEF]">{tracker.imei}</p>
+                                           <p className="text-[10px] font-bold text-slate-400 uppercase">{tracker.model}</p>
+                                        </div>
+                                     </div>
+                                     <ArrowRight size={14} className="text-slate-300 group-hover:text-[#00AEEF]" />
+                                  </button>
+                               ))}
+                            </div>
+                         )}
+                      </div>
+                      <p className="text-[9px] text-emerald-600 mt-1 ml-1 font-bold">Baixa automática de estoque.</p>
+                    </div>
+                )}
+
+                {/* --- LÓGICA DE MANUTENÇÃO (PERGUNTA DE TROCA) --- */}
+                {formData.type === ServiceType.MANUTENCAO && (
+                    <div className="md:col-span-3 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-black text-amber-800 uppercase">Houve troca de equipamento?</p>
+                            <p className="text-[10px] text-amber-600 font-medium">Marque se você retirou um equipamento antigo e colocou um novo.</p>
+                        </div>
+                        <div className="flex gap-2">
+                             <button 
+                                onClick={() => setFormData({...formData, hasExchange: true})}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all border ${formData.hasExchange ? 'bg-amber-500 text-white border-amber-600' : 'bg-white text-slate-400 border-slate-200'}`}
+                             >
+                                Sim, Troquei
+                             </button>
+                             <button 
+                                onClick={() => setFormData({...formData, hasExchange: false})}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all border ${!formData.hasExchange ? 'bg-slate-200 text-slate-600 border-slate-300' : 'bg-white text-slate-400 border-slate-200'}`}
+                             >
+                                Não
+                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- LÓGICA DE RETIRADA / TROCA (CAMPOS DE DEVOLUÇÃO) --- */}
+                {shouldShowRemovalFields && (
+                    <div className="md:col-span-3 bg-red-50 p-6 rounded-[2rem] border border-red-100 animate-in slide-in-from-top-4 space-y-4">
+                        <div className="flex items-center space-x-2 text-red-600 mb-2">
+                            <LogOutIcon size={20} />
+                            <h4 className="text-sm font-black uppercase tracking-widest">Dados do Equipamento Retirado</h4>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-red-400 uppercase mb-2 ml-1">IMEI Retirado</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full px-4 py-3 bg-white border-2 border-red-100 rounded-xl outline-none focus:border-red-400 text-slate-900 font-black"
+                                    placeholder="Digite o IMEI..."
+                                    value={formData.removedImei || ''}
+                                    onChange={(e) => setFormData({...formData, removedImei: e.target.value.replace(/\D/g, '')})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-red-400 uppercase mb-2 ml-1">Modelo</label>
+                                <select 
+                                    className="w-full px-4 py-3 bg-white border-2 border-red-100 rounded-xl outline-none focus:border-red-400 text-slate-900 font-black uppercase"
+                                    value={formData.removedModel || ''}
+                                    onChange={(e) => setFormData({...formData, removedModel: e.target.value})}
+                                >
+                                    <option value="">Selecione...</option>
+                                    {TRACKER_MODELS.map(m => (
+                                        <option key={m} value={m}>{m.toUpperCase()}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-red-400 uppercase mb-2 ml-1">Empresa</label>
+                                <select 
+                                    className="w-full px-4 py-3 bg-white border-2 border-red-100 rounded-xl outline-none focus:border-red-400 text-slate-900 font-black"
+                                    value={formData.removedCompany}
+                                    onChange={(e) => setFormData({...formData, removedCompany: e.target.value as Company})}
+                                >
+                                    {Object.values(Company).map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-red-500 font-bold bg-white/50 p-2 rounded-lg border border-red-100 inline-block">
+                            Este equipamento será enviado para a lista de "AGUARDANDO DEVOLUÇÃO".
+                        </p>
+                    </div>
+                )}
               </div>
 
               {formData.status === ServiceStatus.CANCELADO && (

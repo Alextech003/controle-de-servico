@@ -115,7 +115,7 @@ const App: React.FC = () => {
     setViewingTechnicianId(null);
   };
 
-  // --- CRUD Serviços & BAIXA DE ESTOQUE ---
+  // --- CRUD Serviços & BAIXA DE ESTOQUE & DEVOLUÇÃO ---
   const handleSaveService = async (service: Service) => {
     // 0. Capturar o estado ANTERIOR do serviço (para ver se tinha IMEI antes)
     const oldService = services.find(s => s.id === service.id);
@@ -127,72 +127,84 @@ const App: React.FC = () => {
         return [service, ...prev];
     });
 
-    // 1. LÓGICA DE LIBERAÇÃO DE ESTOQUE (Se removeu ou trocou o IMEI)
-    // Se existia um serviço antigo COM imei, e o novo IMEI é diferente (ou vazio)
-    if (oldService && oldService.imei && oldService.imei !== service.imei) {
-        const oldTracker = trackers.find(t => t.imei === oldService.imei);
-        
-        if (oldTracker) {
-            // Volta o equipamento antigo para DISPONÍVEL
-            const releasedTracker: Tracker = {
-                ...oldTracker,
-                status: TrackerStatus.DISPONIVEL,
-                installationDate: undefined
-            };
-
-            // Atualiza localmente
-            setTrackers(prev => prev.map(t => t.id === releasedTracker.id ? releasedTracker : t));
-            
-            // Atualiza no banco (se não for demo)
-            if (!isDemoMode) {
-               await supabase.from('trackers').update(mapTrackerToDB(releasedTracker)).eq('id', releasedTracker.id);
-            }
-        }
-    }
-
     if (isDemoMode) {
-        // Simula baixa de estoque no modo demo
-        if (service.imei) {
-           setTrackers(prev => prev.map(t => t.imei === service.imei ? { 
-              ...t, 
-              status: TrackerStatus.INSTALADO,
-              installationDate: service.date 
-           } : t));
-        }
-        alert("Modo Demo: Serviço salvo localmente.");
+        alert("Modo Demo: Serviço salvo localmente (sem lógica complexa de estoque).");
         return;
     }
 
     try {
       const dbPayload = mapServiceToDB(service);
 
-      // 2. Salva o Serviço no Banco
+      // 1. Salva o Serviço no Banco
       const { error } = oldService 
         ? await supabase.from('services').update(dbPayload).eq('id', service.id)
         : await supabase.from('services').insert(dbPayload);
 
       if (error) throw error;
 
-      // 3. Lógica de Baixa de Estoque Automática (Vincular NOVO Equipamento)
+      // === LÓGICA DE ESTOQUE (INSTALAÇÃO) ===
+      
+      // A) Se removeu ou trocou o IMEI de instalação: Libera o antigo
+      if (oldService && oldService.imei && oldService.imei !== service.imei) {
+          const oldTracker = trackers.find(t => t.imei === oldService.imei);
+          if (oldTracker) {
+              const releasedTracker: Tracker = {
+                  ...oldTracker,
+                  status: TrackerStatus.DISPONIVEL,
+                  installationDate: undefined
+              };
+              setTrackers(prev => prev.map(t => t.id === releasedTracker.id ? releasedTracker : t));
+              await supabase.from('trackers').update(mapTrackerToDB(releasedTracker)).eq('id', releasedTracker.id);
+          }
+      }
+
+      // B) Se adicionou um novo IMEI de instalação: Baixa do estoque (INSTALADO)
       if (service.imei && (!oldService || oldService.imei !== service.imei)) {
          const tracker = trackers.find(t => t.imei === service.imei);
-         
-         // Se encontrou e ele está DISPONÍVEL (ou se estamos apenas atualizando dados)
          if (tracker && tracker.status === TrackerStatus.DISPONIVEL) {
              const updatedTracker: Tracker = { 
                ...tracker, 
                status: TrackerStatus.INSTALADO,
                installationDate: service.date 
              };
-             
-             // Atualiza estado local dos rastreadores
              setTrackers(prev => prev.map(t => t.id === tracker.id ? updatedTracker : t));
-             
-             // Atualiza no banco
-             const { error: trackerError } = await supabase.from('trackers').update(mapTrackerToDB(updatedTracker)).eq('id', tracker.id);
-             if (trackerError) console.error("Erro ao baixar estoque:", trackerError);
-             else console.log(`Baixa de estoque efetuada para IMEI ${service.imei}`);
+             await supabase.from('trackers').update(mapTrackerToDB(updatedTracker)).eq('id', tracker.id);
          }
+      }
+
+      // === LÓGICA DE DEVOLUÇÃO (RETIRADA) ===
+      // Se o serviço tem equipamento retirado, esse equipamento deve ir para a lista "AGUARDANDO DEVOLUÇÃO"
+      if (service.removedImei && service.removedModel) {
+          // Verifica se esse rastreador já existe no sistema (ex: estava instalado)
+          const existingTracker = trackers.find(t => t.imei === service.removedImei);
+          
+          if (existingTracker) {
+              // Atualiza para status DEVOLUCAO
+              const returnedTracker: Tracker = {
+                  ...existingTracker,
+                  status: TrackerStatus.DEVOLUCAO,
+                  model: service.removedModel, // Atualiza modelo caso esteja diferente
+                  company: service.removedCompany || existingTracker.company,
+                  technicianId: service.technicianId, // Garante que está com o técnico que retirou
+                  technicianName: service.technicianName
+              };
+              setTrackers(prev => prev.map(t => t.id === returnedTracker.id ? returnedTracker : t));
+              await supabase.from('trackers').update(mapTrackerToDB(returnedTracker)).eq('id', returnedTracker.id);
+          } else {
+              // Se não existe, cria um novo rastreador já com status DEVOLUCAO
+              const newReturnTracker: Tracker = {
+                  id: Math.random().toString(36).substring(2) + Date.now().toString(36),
+                  date: service.date, // Data da retirada
+                  model: service.removedModel,
+                  imei: service.removedImei,
+                  company: service.removedCompany || service.company,
+                  status: TrackerStatus.DEVOLUCAO,
+                  technicianId: service.technicianId,
+                  technicianName: service.technicianName
+              };
+              setTrackers(prev => [...prev, newReturnTracker]);
+              await supabase.from('trackers').insert(mapTrackerToDB(newReturnTracker));
+          }
       }
 
     } catch (error: any) {
@@ -200,53 +212,47 @@ const App: React.FC = () => {
       
       const msg = error.message || '';
       
-      // TRATAMENTO ESPECÍFICO PARA FALTA DA COLUNA IMEI
-      if (msg.includes("Could not find the 'imei' column") || msg.includes("imei")) {
-         alert("ATENÇÃO: O banco de dados precisa ser atualizado!\n\nA coluna 'imei' não existe na tabela 'services'.\n\nPor favor, execute este comando no SQL Editor do Supabase:\n\nALTER TABLE public.services ADD COLUMN IF NOT EXISTS imei text;");
+      // TRATAMENTO ESPECÍFICO PARA FALTA DAS COLUNAS NOVAS
+      if (msg.includes("removed_imei") || msg.includes("has_exchange")) {
+         alert("ATENÇÃO: O banco de dados precisa ser atualizado!\n\nAs colunas de retirada não existem na tabela 'services'.\n\nPor favor, execute o SQL de atualização no Supabase.");
+      } else if (msg.includes("imei")) {
+         alert("ATENÇÃO: Coluna 'imei' faltando.");
       } else {
          alert(`Erro ao salvar no banco de dados: ${msg}`);
       }
       
-      // Reverter estado local em caso de erro
       fetchAllData();
     }
   };
 
   const handleDeleteService = async (id: string) => {
-    // 1. Identificar o serviço a ser excluído para verificar se tem IMEI vinculado
+    // 1. Identificar o serviço a ser excluído
     const serviceToDelete = services.find(s => String(s.id) === String(id));
     
-    // 2. Atualização Otimista da Lista de Serviços
+    // 2. Atualização Otimista
     const previousServices = [...services];
     setServices(prev => prev.filter(s => String(s.id) !== String(id)));
 
-    // 3. Lógica de Reversão de Estoque (Se tinha IMEI, volta para DISPONIVEL)
+    // 3. Reversão de Estoque (Se tinha IMEI instalado, volta pra DISPONIVEL)
     if (serviceToDelete && serviceToDelete.imei) {
         const tracker = trackers.find(t => t.imei === serviceToDelete.imei);
-        
         if (tracker) {
-            // Cria o objeto atualizado
             const updatedTracker: Tracker = {
                 ...tracker,
                 status: TrackerStatus.DISPONIVEL,
-                installationDate: undefined // Remove a data de instalação
+                installationDate: undefined
             };
-
-            // Atualiza visualmente na hora
             setTrackers(prev => prev.map(t => t.id === tracker.id ? updatedTracker : t));
-
-            // Atualiza no Banco (se não for demo)
             if (!isDemoMode) {
-                supabase.from('trackers')
-                    .update(mapTrackerToDB(updatedTracker))
-                    .eq('id', tracker.id)
-                    .then(({ error }) => {
-                        if (error) console.error("Erro ao liberar rastreador:", error);
-                        else console.log(`Rastreador ${tracker.imei} liberado com sucesso.`);
-                    });
+                supabase.from('trackers').update(mapTrackerToDB(updatedTracker)).eq('id', tracker.id).then();
             }
         }
     }
+
+    // 4. Reversão de Devolução (Se tinha IMEI retirado, o que fazer?)
+    // Por segurança, se excluímos o serviço de retirada, o equipamento "retirado" deveria tecnicamente voltar a ser "instalado" ou sumir.
+    // Para simplificar e evitar erros, vamos apenas apagar o registro de "Aguardando Devolução" se ele foi criado por este serviço?
+    // É complexo rastrear a origem. Vamos deixar o rastreador como está (DEVOLUCAO) e o usuário ajusta manualmente na aba Rastreadores se precisar.
 
     if (isDemoMode) return;
 
@@ -255,8 +261,8 @@ const App: React.FC = () => {
       if (error) throw error;
     } catch (error: any) {
       alert(`Erro ao excluir no servidor: ${error.message}`);
-      setServices(previousServices); // Reverte a exclusão visual se der erro
-      fetchAllData(); // Recarrega tudo para garantir consistência
+      setServices(previousServices); 
+      fetchAllData();
     }
   };
 

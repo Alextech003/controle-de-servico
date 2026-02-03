@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Plus, Search, Trash2, X, Save, 
   Radio, Barcode, CalendarDays,
-  Loader2, ArrowRight
+  Loader2, ArrowRight, Package
 } from 'lucide-react';
 import { 
   Tracker, TrackerStatus, User, UserRole, Company 
@@ -24,7 +24,11 @@ const TRACKER_MODELS = [
   "Nonus N4",
   "Genérico J16",
   "Lumiar LT32",
-  "Lumiar LT32-PRO"
+  "Lumiar LT32-PRO",
+  "Queclink GV55",
+  "Queclink GV57",
+  "NT20",
+  "TR05"
 ];
 
 const Trackers: React.FC<TrackersProps> = ({ 
@@ -32,9 +36,12 @@ const Trackers: React.FC<TrackersProps> = ({
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingTracker, setEditingTracker] = useState<Tracker | null>(null);
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null); // Estado para confirmação
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Controle de Abas (Estoque vs Retirados)
+  const [activeTab, setActiveTab] = useState<'ESTOQUE' | 'RETIRADOS'>('ESTOQUE');
   const [activeCompanyFilter, setActiveCompanyFilter] = useState<Company | 'ALL'>('ALL');
   
   // Estado para Admin/Master controlar qual técnico está vendo
@@ -55,26 +62,34 @@ const Trackers: React.FC<TrackersProps> = ({
   // Filtra rastreadores
   const filteredTrackers = useMemo(() => {
     let list = trackers;
+
+    // 1. Filtra por Aba (Estoque vs Retirados)
+    if (activeTab === 'ESTOQUE') {
+        // Mostra Disponíveis e Instalados (Todo o histórico ativo)
+        list = list.filter(t => t.status !== TrackerStatus.DEVOLUCAO);
+    } else {
+        // Mostra apenas Retirados aguardando devolução
+        list = list.filter(t => t.status === TrackerStatus.DEVOLUCAO);
+    }
     
-    // Se for gerente, filtra pelo técnico selecionado (ou mostra todos se nenhum selecionado)
+    // 2. Filtra por Técnico
     if (isManager && viewingTechId) {
        list = list.filter(t => t.technicianId === viewingTechId);
-    } 
-    // Se for técnico, filtra só os dele (já vem filtrado do App.tsx, mas por segurança)
-    else if (!isManager) {
+    } else if (!isManager) {
        list = list.filter(t => t.technicianId === currentUser.id);
     }
 
-    // Filtro por Empresa (Tabs)
+    // 3. Filtro por Empresa (Tabs)
     if (activeCompanyFilter !== 'ALL') {
         list = list.filter(t => t.company === activeCompanyFilter);
     }
 
+    // 4. Busca
     return list.filter(t => 
       t.imei.toLowerCase().includes(searchTerm.toLowerCase()) || 
       t.model.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [trackers, viewingTechId, isManager, currentUser.id, searchTerm, activeCompanyFilter]);
+  }, [trackers, viewingTechId, isManager, currentUser.id, searchTerm, activeCompanyFilter, activeTab]);
 
   // Agrupamento por Data de Entrada e Ordenação por Empresa
   const groupedTrackers = useMemo(() => {
@@ -91,15 +106,10 @@ const Trackers: React.FC<TrackersProps> = ({
     // 2. Ordenar dentro de cada data: Empresa (A-Z) -> Modelo -> IMEI
     Object.keys(groups).forEach(date => {
         groups[date].sort((a, b) => {
-            // Critério Principal: Empresa
             const companyCompare = a.company.localeCompare(b.company);
             if (companyCompare !== 0) return companyCompare;
-            
-            // Critério Secundário: Modelo
             const modelCompare = a.model.localeCompare(b.model);
             if (modelCompare !== 0) return modelCompare;
-
-            // Critério Terciário: IMEI
             return a.imei.localeCompare(b.imei);
         });
     });
@@ -114,14 +124,13 @@ const Trackers: React.FC<TrackersProps> = ({
     }
 
     // VERIFICAÇÃO DE DUPLICIDADE DE IMEI
-    // Procura se existe algum rastreador com o mesmo IMEI, excluindo o próprio (caso esteja editando)
     const duplicate = trackers.find(t => 
         t.imei === formData.imei && 
         t.id !== (editingTracker?.id || '')
     );
 
     if (duplicate) {
-        alert(`ERRO: O IMEI ${formData.imei} já está cadastrado no sistema (Técnico: ${duplicate.technicianName}).`);
+        alert(`ERRO: O IMEI ${formData.imei} já está cadastrado no sistema.`);
         return;
     }
 
@@ -138,7 +147,6 @@ const Trackers: React.FC<TrackersProps> = ({
         id: idToUse,
         technicianId: editingTracker ? editingTracker.technicianId : targetTechId,
         technicianName: editingTracker ? editingTracker.technicianName : targetTechName,
-        // CORREÇÃO: Se o usuário mudar manualmente para DISPONÍVEL, limpamos a data de instalação
         installationDate: formData.status === TrackerStatus.DISPONIVEL ? undefined : (editingTracker?.installationDate)
     } as Tracker;
 
@@ -167,6 +175,7 @@ const Trackers: React.FC<TrackersProps> = ({
       case TrackerStatus.DISPONIVEL: return 'text-emerald-600 bg-emerald-50 border-emerald-200';
       case TrackerStatus.INSTALADO: return 'text-blue-600 bg-blue-50 border-blue-200';
       case TrackerStatus.DEFEITO: return 'text-rose-600 bg-rose-50 border-rose-200';
+      case TrackerStatus.DEVOLUCAO: return 'text-amber-600 bg-amber-50 border-amber-200';
       default: return 'text-slate-600 bg-slate-50 border-slate-200';
     }
   };
@@ -214,9 +223,28 @@ const Trackers: React.FC<TrackersProps> = ({
                 <h1 className="text-2xl md:text-3xl font-black text-slate-800 uppercase tracking-tight">Rastreadores</h1>
                 <p className="text-slate-500 font-medium">Controle de Estoque e Equipamentos</p>
             </div>
+            
+            {/* SELETOR DE ABAS PRINCIPAL */}
+            <div className="flex bg-slate-200/50 p-1.5 rounded-2xl">
+                 <button 
+                    onClick={() => setActiveTab('ESTOQUE')}
+                    className={`flex items-center px-6 py-2.5 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'ESTOQUE' ? 'bg-white text-[#0A192F] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                    <Radio size={16} className="mr-2" />
+                    Estoque Ativo
+                 </button>
+                 <button 
+                    onClick={() => setActiveTab('RETIRADOS')}
+                    className={`flex items-center px-6 py-2.5 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'RETIRADOS' ? 'bg-amber-100 text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                    <Package size={16} className="mr-2" />
+                    Retirados / Devolução
+                 </button>
+            </div>
+
             <button onClick={() => { setEditingTracker(null); setFormData(initialFormState); setShowForm(true); }} className="px-6 py-3 bg-[#0A192F] text-white rounded-xl text-sm font-black uppercase shadow-xl shadow-blue-900/10 active:scale-95 transition-all flex items-center justify-center space-x-2">
                 <Plus size={20} className="text-[#00AEEF]" />
-                <span>Cadastrar Equipamento</span>
+                <span>{activeTab === 'ESTOQUE' ? 'Cadastrar Equipamento' : 'Registrar Retirada'}</span>
             </button>
         </div>
 
@@ -239,12 +267,12 @@ const Trackers: React.FC<TrackersProps> = ({
                 <table className="w-full text-left">
                     <thead className="bg-slate-50/80 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100">
                         <tr>
-                            <th className="px-6 py-5 whitespace-nowrap">Data Entrada</th>
+                            <th className="px-6 py-5 whitespace-nowrap">{activeTab === 'RETIRADOS' ? 'Data Retirada' : 'Data Entrada'}</th>
                             <th className="px-6 py-5 whitespace-nowrap">Empresa</th>
                             <th className="px-6 py-5 whitespace-nowrap">Modelo</th>
                             <th className="px-6 py-5 whitespace-nowrap">IMEI</th>
                             {isManager && <th className="px-6 py-5 whitespace-nowrap">Técnico Responsável</th>}
-                            <th className="px-6 py-5 text-center whitespace-nowrap">Status / Instalação</th>
+                            <th className="px-6 py-5 text-center whitespace-nowrap">Status</th>
                             <th className="px-6 py-5 text-center whitespace-nowrap">Ações</th>
                         </tr>
                     </thead>
@@ -254,7 +282,6 @@ const Trackers: React.FC<TrackersProps> = ({
                         ) : (
                             Object.keys(groupedTrackers).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()).map(date => (
                                 <React.Fragment key={date}>
-                                    {/* Linha de Separação por Data */}
                                     <tr className="bg-slate-50/50">
                                         <td colSpan={7} className="px-6 py-3">
                                             <div className="flex items-center w-full">
@@ -262,7 +289,8 @@ const Trackers: React.FC<TrackersProps> = ({
                                                 <div className="px-4 py-1.5 bg-white border border-blue-100 rounded-full flex items-center space-x-2 shadow-sm mx-4">
                                                     <CalendarDays size={14} className="text-[#00AEEF]" />
                                                     <span className="text-[11px] font-black text-slate-700 uppercase">
-                                                        Entrada: {new Date(date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                                                        {activeTab === 'RETIRADOS' ? 'Retirado em: ' : 'Entrada: '} 
+                                                        {new Date(date + 'T12:00:00').toLocaleDateString('pt-BR')}
                                                     </span>
                                                 </div>
                                                 <div className="h-px bg-blue-200 flex-1"></div>
@@ -302,12 +330,12 @@ const Trackers: React.FC<TrackersProps> = ({
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center space-x-2">
-                                                    {/* AGORA O BOTÃO DE EDIÇÃO SEMPRE APARECE PARA PERMITIR CORREÇÃO */}
                                                     <button onClick={() => openEdit(t)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
                                                         <Radio size={18} />
                                                     </button>
                                                     
-                                                    {t.status === TrackerStatus.DISPONIVEL ? (
+                                                    {/* Permite exclusão se Disponível ou se for um item de Devolução (para limpar do sistema após devolver) */}
+                                                    {(t.status === TrackerStatus.DISPONIVEL || t.status === TrackerStatus.DEVOLUCAO) ? (
                                                         <button 
                                                             onClick={() => setConfirmingDeleteId(t.id)} 
                                                             className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" 
@@ -343,7 +371,7 @@ const Trackers: React.FC<TrackersProps> = ({
             <div className="p-8 space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Data de Entrada</label>
+                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Data de Referência</label>
                         <input type="date" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} />
                     </div>
                     <div className="col-span-2">
@@ -401,6 +429,7 @@ const Trackers: React.FC<TrackersProps> = ({
                             className={`w-full px-5 py-4 border-2 rounded-2xl outline-none font-black text-slate-900 ${
                                 formData.status === TrackerStatus.DISPONIVEL ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
                                 formData.status === TrackerStatus.INSTALADO ? 'bg-blue-50 border-blue-100 text-blue-700' :
+                                formData.status === TrackerStatus.DEVOLUCAO ? 'bg-amber-50 border-amber-100 text-amber-700' :
                                 'bg-rose-50 border-rose-100 text-rose-700'
                             }`}
                             value={formData.status}
@@ -408,10 +437,11 @@ const Trackers: React.FC<TrackersProps> = ({
                         >
                             <option value={TrackerStatus.DISPONIVEL}>DISPONÍVEL</option>
                             <option value={TrackerStatus.INSTALADO}>INSTALADO (EM USO)</option>
+                            <option value={TrackerStatus.DEVOLUCAO}>AGUARDANDO DEVOLUÇÃO</option>
                             <option value={TrackerStatus.DEFEITO}>DEFEITO</option>
                         </select>
                         <p className="text-[9px] text-slate-400 mt-1 font-medium ml-1">
-                            Atenção: Use "DISPONÍVEL" para corrigir equipamentos que não estão em uso.
+                            Use "AGUARDANDO DEVOLUÇÃO" para equipamentos retirados de clientes.
                         </p>
                     </div>
 
@@ -434,8 +464,8 @@ const Trackers: React.FC<TrackersProps> = ({
                 <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
                     <Trash2 size={40} />
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">Excluir Equipamento?</h3>
-                <p className="text-slate-500 text-sm mb-8">Esta ação removerá o rastreador do estoque permanentemente.</p>
+                <h3 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">Excluir Registro?</h3>
+                <p className="text-slate-500 text-sm mb-8">Esta ação removerá o item permanentemente.</p>
                 <div className="grid grid-cols-2 gap-4">
                     <button onClick={() => setConfirmingDeleteId(null)} className="py-4 bg-slate-100 text-slate-600 font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-200 transition-colors">Cancelar</button>
                     <button onClick={executeDelete} className="py-4 bg-red-600 text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-lg shadow-red-200 hover:bg-red-700 transition-colors">Excluir</button>

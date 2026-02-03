@@ -49,7 +49,8 @@ export enum ReimbursementStatus {
 export enum TrackerStatus {
   DISPONIVEL = 'DISPONÍVEL',
   INSTALADO = 'INSTALADO',
-  DEFEITO = 'DEFEITO'
+  DEFEITO = 'DEFEITO',
+  DEVOLUCAO = 'AGUARDANDO DEVOLUÇÃO'
 }
 
 export interface User {
@@ -77,7 +78,13 @@ export interface Service {
   technicianName: string;
   cancellationReason?: string;
   cancelledBy?: CancelledBy;
-  imei?: string; // Novo campo para vincular equipamento
+  imei?: string; // Equipamento instalado (novo)
+  
+  // Novos campos para controle de retirada
+  hasExchange?: boolean; // Se houve troca na manutenção
+  removedImei?: string;
+  removedModel?: string;
+  removedCompany?: Company;
 }
 
 export interface Reimbursement {
