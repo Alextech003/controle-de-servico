@@ -137,7 +137,9 @@ const Trackers: React.FC<TrackersProps> = ({
         ...formData,
         id: idToUse,
         technicianId: editingTracker ? editingTracker.technicianId : targetTechId,
-        technicianName: editingTracker ? editingTracker.technicianName : targetTechName
+        technicianName: editingTracker ? editingTracker.technicianName : targetTechName,
+        // CORREÇÃO: Se o usuário mudar manualmente para DISPONÍVEL, limpamos a data de instalação
+        installationDate: formData.status === TrackerStatus.DISPONIVEL ? undefined : (editingTracker?.installationDate)
     } as Tracker;
 
     await onSaveTracker(trackerToSave);
@@ -300,21 +302,21 @@ const Trackers: React.FC<TrackersProps> = ({
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center space-x-2">
+                                                    {/* AGORA O BOTÃO DE EDIÇÃO SEMPRE APARECE PARA PERMITIR CORREÇÃO */}
+                                                    <button onClick={() => openEdit(t)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
+                                                        <Radio size={18} />
+                                                    </button>
+                                                    
                                                     {t.status === TrackerStatus.DISPONIVEL ? (
-                                                        <>
-                                                            <button onClick={() => openEdit(t)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
-                                                                <Radio size={18} />
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => setConfirmingDeleteId(t.id)} 
-                                                                className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" 
-                                                                title="Excluir"
-                                                            >
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        </>
+                                                        <button 
+                                                            onClick={() => setConfirmingDeleteId(t.id)} 
+                                                            className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" 
+                                                            title="Excluir"
+                                                        >
+                                                            <Trash2 size={18} />
+                                                        </button>
                                                     ) : (
-                                                        <span className="text-[9px] text-slate-300 font-bold uppercase">Em Uso</span>
+                                                       <span className="text-[9px] text-slate-300 font-bold uppercase ml-2 select-none">Em Uso</span>
                                                     )}
                                                 </div>
                                             </td>
@@ -391,11 +393,33 @@ const Trackers: React.FC<TrackersProps> = ({
                             </div>
                         </div>
                     </div>
+                    
+                    {/* CAMPO DE STATUS PARA CORREÇÃO MANUAL */}
+                    <div className="col-span-2">
+                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Status Atual</label>
+                        <select
+                            className={`w-full px-5 py-4 border-2 rounded-2xl outline-none font-black text-slate-900 ${
+                                formData.status === TrackerStatus.DISPONIVEL ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
+                                formData.status === TrackerStatus.INSTALADO ? 'bg-blue-50 border-blue-100 text-blue-700' :
+                                'bg-rose-50 border-rose-100 text-rose-700'
+                            }`}
+                            value={formData.status}
+                            onChange={(e) => setFormData({...formData, status: e.target.value as TrackerStatus})}
+                        >
+                            <option value={TrackerStatus.DISPONIVEL}>DISPONÍVEL</option>
+                            <option value={TrackerStatus.INSTALADO}>INSTALADO (EM USO)</option>
+                            <option value={TrackerStatus.DEFEITO}>DEFEITO</option>
+                        </select>
+                        <p className="text-[9px] text-slate-400 mt-1 font-medium ml-1">
+                            Atenção: Use "DISPONÍVEL" para corrigir equipamentos que não estão em uso.
+                        </p>
+                    </div>
+
                 </div>
 
                 <button onClick={handleSave} disabled={isSaving} className="w-full py-4 bg-[#0A192F] text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl flex items-center justify-center space-x-2 mt-4">
                     {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} className="text-[#00AEEF]" />}
-                    <span>{isSaving ? 'Salvando...' : 'Salvar Equipamento'}</span>
+                    <span>{isSaving ? 'Salvando...' : 'Salvar Alterações'}</span>
                 </button>
             </div>
           </div>

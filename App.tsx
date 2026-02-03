@@ -117,12 +117,38 @@ const App: React.FC = () => {
 
   // --- CRUD Serviços & BAIXA DE ESTOQUE ---
   const handleSaveService = async (service: Service) => {
+    // 0. Capturar o estado ANTERIOR do serviço (para ver se tinha IMEI antes)
+    const oldService = services.find(s => s.id === service.id);
+
     // Optimistic Update (Atualiza UI primeiro)
     setServices(prev => {
         const exists = prev.find(s => s.id === service.id);
         if (exists) return prev.map(s => s.id === service.id ? service : s);
         return [service, ...prev];
     });
+
+    // 1. LÓGICA DE LIBERAÇÃO DE ESTOQUE (Se removeu ou trocou o IMEI)
+    // Se existia um serviço antigo COM imei, e o novo IMEI é diferente (ou vazio)
+    if (oldService && oldService.imei && oldService.imei !== service.imei) {
+        const oldTracker = trackers.find(t => t.imei === oldService.imei);
+        
+        if (oldTracker) {
+            // Volta o equipamento antigo para DISPONÍVEL
+            const releasedTracker: Tracker = {
+                ...oldTracker,
+                status: TrackerStatus.DISPONIVEL,
+                installationDate: undefined
+            };
+
+            // Atualiza localmente
+            setTrackers(prev => prev.map(t => t.id === releasedTracker.id ? releasedTracker : t));
+            
+            // Atualiza no banco (se não for demo)
+            if (!isDemoMode) {
+               await supabase.from('trackers').update(mapTrackerToDB(releasedTracker)).eq('id', releasedTracker.id);
+            }
+        }
+    }
 
     if (isDemoMode) {
         // Simula baixa de estoque no modo demo
@@ -138,20 +164,20 @@ const App: React.FC = () => {
     }
 
     try {
-      const exists = services.find(s => s.id === service.id);
       const dbPayload = mapServiceToDB(service);
 
-      // 1. Salva o Serviço no Banco
-      const { error } = exists 
+      // 2. Salva o Serviço no Banco
+      const { error } = oldService 
         ? await supabase.from('services').update(dbPayload).eq('id', service.id)
         : await supabase.from('services').insert(dbPayload);
 
       if (error) throw error;
 
-      // 2. Lógica de Baixa de Estoque Automática (Vincular Equipamento)
-      if (service.imei) {
+      // 3. Lógica de Baixa de Estoque Automática (Vincular NOVO Equipamento)
+      if (service.imei && (!oldService || oldService.imei !== service.imei)) {
          const tracker = trackers.find(t => t.imei === service.imei);
          
+         // Se encontrou e ele está DISPONÍVEL (ou se estamos apenas atualizando dados)
          if (tracker && tracker.status === TrackerStatus.DISPONIVEL) {
              const updatedTracker: Tracker = { 
                ...tracker, 

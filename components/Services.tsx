@@ -5,7 +5,8 @@ import {
   MessageSquare, Table as TableIcon,
   ArrowRight, CopyPlus, Loader2,
   Users as UsersIcon, Check, XCircle, ChevronLeft, ChevronRight,
-  MapPin, CalendarDays, Car, Barcode, Box, DollarSign
+  MapPin, CalendarDays, Car, Barcode, Box, DollarSign,
+  ScanBarcode, Cpu
 } from 'lucide-react';
 import { 
   Service, ServiceStatus, ServiceType, Company, 
@@ -31,6 +32,7 @@ const Services: React.FC<ServicesProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [viewingReason, setViewingReason] = useState<Service | null>(null);
+  const [viewingTrackerInfo, setViewingTrackerInfo] = useState<Partial<Tracker> | null>(null);
   
   // Controle do Autocomplete do IMEI
   const [showImeiSuggestions, setShowImeiSuggestions] = useState(false);
@@ -230,6 +232,17 @@ const Services: React.FC<ServicesProps> = ({
     setConfirmingDeleteId(null);
   };
 
+  const openTrackerInfo = (e: React.MouseEvent, imei: string) => {
+      e.stopPropagation();
+      const tracker = trackers.find(t => t.imei === imei);
+      if (tracker) {
+          setViewingTrackerInfo(tracker);
+      } else {
+          // Caso não ache no estoque (foi excluído ou digitado manual), mostra apenas o IMEI
+          setViewingTrackerInfo({ imei: imei, model: 'Não identificado', status: TrackerStatus.DISPONIVEL });
+      }
+  };
+
   const isAdmin = currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN;
   const canEdit = currentUser.role !== UserRole.ADMIN;
 
@@ -377,6 +390,17 @@ const Services: React.FC<ServicesProps> = ({
                                     <div className="flex items-center justify-center space-x-1">
                                     {s.status === ServiceStatus.CANCELADO && <button onClick={() => setViewingReason(s)} className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"><MessageSquare size={14} /></button>}
                                     
+                                    {/* Botão de Ver Equipamento (Se tiver IMEI) */}
+                                    {s.imei && (
+                                        <button 
+                                            onClick={(e) => openTrackerInfo(e, s.imei!)}
+                                            className="p-1.5 text-slate-300 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                                            title="Ver Equipamento Instalado"
+                                        >
+                                            <ScanBarcode size={14} />
+                                        </button>
+                                    )}
+
                                     {canEdit && (
                                         <>
                                         {confirmingDeleteId === s.id ? (
@@ -553,6 +577,7 @@ const Services: React.FC<ServicesProps> = ({
         </div>
       )}
 
+      {/* Modal de Detalhes do Cancelamento */}
       {viewingReason && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0A192F]/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-300">
@@ -566,6 +591,40 @@ const Services: React.FC<ServicesProps> = ({
                     <p className="text-xs text-slate-400 font-bold uppercase mt-4">Cancelado por: <span className="text-slate-600">{viewingReason.cancelledBy}</span></p>
                  </div>
                  <button onClick={() => setViewingReason(null)} className="w-full py-4 bg-slate-100 text-slate-600 font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-200 transition-colors">
+                    Fechar
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Modal de Detalhes do Equipamento */}
+      {viewingTrackerInfo && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0A192F]/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-300">
+              <div className="p-8 text-center space-y-6">
+                 <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                    <Cpu size={32} />
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-1">Equipamento Instalado</h3>
+                    <p className="text-xs text-slate-400 font-bold uppercase mb-4">Detalhes do Rastreador</p>
+                    
+                    <div className="space-y-3">
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Modelo</p>
+                            <p className="text-sm font-black text-slate-800 uppercase">{viewingTrackerInfo.model || 'N/A'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">IMEI</p>
+                            <div className="flex items-center justify-center gap-2 text-slate-800">
+                                <Barcode size={14} />
+                                <p className="text-sm font-black font-mono">{viewingTrackerInfo.imei}</p>
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+                 <button onClick={() => setViewingTrackerInfo(null)} className="w-full py-4 bg-purple-600 text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200">
                     Fechar
                  </button>
               </div>
