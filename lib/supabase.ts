@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Service, User, ServiceType, Company, ServiceStatus, CancelledBy, UserRole, Reimbursement, ReimbursementType, ReimbursementStatus, Tracker, TrackerStatus } from '../types';
+import { Service, User, ServiceType, Company, ServiceStatus, CancelledBy, UserRole, Reimbursement, ReimbursementType, ReimbursementStatus, Tracker, TrackerStatus, AppNotification } from '../types';
 
 // =========================================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS
@@ -114,7 +114,7 @@ export const mapTrackerFromDB = (t: any): Tracker => ({
   date: t.date,
   model: t.model,
   imei: t.imei,
-  company: t.company as Company, // Adicionado mapeamento de empresa
+  company: t.company as Company, 
   status: t.status as TrackerStatus,
   technicianId: t.technician_id,
   technicianName: t.technician_name,
@@ -130,6 +130,29 @@ export const mapTrackerToDB = (t: Partial<Tracker>) => ({
   status: t.status,
   technician_id: t.technicianId,
   technician_name: t.technicianName,
-  // Garante que se for undefined, envia null para o banco não reclamar ou ignorar errado
   installation_date: t.installationDate || null 
+});
+
+// --- NOTIFICATIONS MAPPERS ---
+
+export const mapNotificationFromDB = (n: any): AppNotification => ({
+  id: n.id,
+  createdAt: n.created_at,
+  recipientId: n.recipient_id,
+  authorName: n.author_name,
+  title: n.title,
+  message: n.message,
+  isRead: n.is_read,
+  relatedEntityId: n.related_entity_id
+});
+
+export const mapNotificationToDB = (n: Partial<AppNotification>) => ({
+  id: n.id,
+  created_at: n.createdAt,
+  recipient_id: n.recipientId,
+  author_name: n.authorName,
+  title: n.title,
+  message: n.message,
+  is_read: n.isRead,
+  related_entity_id: n.relatedEntityId
 });

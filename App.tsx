@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, UserRole, Service, ServiceStatus, Reimbursement, Tracker, TrackerStatus } from './types';
+import { User, UserRole, Service, ServiceStatus, Reimbursement, Tracker, TrackerStatus, AppNotification } from './types';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Services from './components/Services';
@@ -12,9 +12,10 @@ import Login from './components/Login';
 import Logo from './components/Logo';
 import MonthlyReminder from './components/MonthlyReminder';
 import ReimbursementIntro from './components/ReimbursementIntro';
-import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB, mapReimbursementFromDB, mapReimbursementToDB, mapTrackerFromDB, mapTrackerToDB } from './lib/supabase';
+import NotificationsPanel from './components/NotificationsPanel';
+import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB, mapReimbursementFromDB, mapReimbursementToDB, mapTrackerFromDB, mapTrackerToDB, mapNotificationFromDB, mapNotificationToDB } from './lib/supabase';
 import { MOCK_USERS, MOCK_REIMBURSEMENTS, MOCK_TRACKERS, MOCK_SERVICES } from './constants';
-import { Loader2, Menu, AlertTriangle, Database } from 'lucide-react';
+import { Loader2, Menu, Database, Bell } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -23,10 +24,13 @@ const App: React.FC = () => {
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
   const [trackers, setTrackers] = useState<Tracker[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  
   const [viewingTechnicianId, setViewingTechnicianId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
 
   // Carregar dados iniciais
@@ -69,29 +73,20 @@ const App: React.FC = () => {
         }
       }
 
-      // Buscar Serviços, Reembolsos e Rastreadores
+      // Buscar Serviços, Reembolsos, Rastreadores e Notificações
       if (!isDemoMode) {
-          const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').order('date', { ascending: false });
-          if (!servicesError && servicesData) {
-              setServices(servicesData.map(mapServiceFromDB));
-          }
+          const { data: servicesData } = await supabase.from('services').select('*').order('date', { ascending: false });
+          if (servicesData) setServices(servicesData.map(mapServiceFromDB));
 
-          const { data: reimbData, error: reimbError } = await supabase.from('reimbursements').select('*').order('date', { ascending: false });
-          if (!reimbError && reimbData) {
-              setReimbursements(reimbData.map(mapReimbursementFromDB));
-          }
+          const { data: reimbData } = await supabase.from('reimbursements').select('*').order('date', { ascending: false });
+          if (reimbData) setReimbursements(reimbData.map(mapReimbursementFromDB));
 
-          const { data: trackersData, error: trackersError } = await supabase.from('trackers').select('*').order('date', { ascending: false });
-          if (!trackersError && trackersData) {
-              setTrackers(trackersData.map(mapTrackerFromDB));
-          } else {
-             // Caso a tabela ainda não exista no Supabase ou erro de fetch
-             console.log('Tabela trackers vazia ou inexistente:', trackersError);
-             // Não sobrescreve com vazio se der erro de conexão, mantém o que tem ou vazio
-             if (trackersError?.code !== 'PGRST301') {
-                setTrackers([]);
-             }
-          }
+          const { data: trackersData } = await supabase.from('trackers').select('*').order('date', { ascending: false });
+          if (trackersData) setTrackers(trackersData.map(mapTrackerFromDB));
+          
+          // Buscar Notificações
+          const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+          if (notifData) setNotifications(notifData.map(mapNotificationFromDB));
       } 
       
       setDbError(null);
@@ -99,7 +94,7 @@ const App: React.FC = () => {
       console.error("Erro ao conectar com banco:", error);
       setIsDemoMode(true);
       setUsers(prev => prev.length > 0 ? prev : MOCK_USERS);
-      setTrackers(MOCK_TRACKERS); // Fallback
+      setTrackers(MOCK_TRACKERS);
     }
   };
 
@@ -115,86 +110,121 @@ const App: React.FC = () => {
     setViewingTechnicianId(null);
   };
 
+  // === SISTEMA DE NOTIFICAÇÃO (GHOST MODE: Alex Master Invisível) ===
+  const notifyTechnician = async (recipientId: string, title: string, message: string, relatedEntityId?: string) => {
+      // 1. Ghost Mode: Se for Alex Master (ID 1) ou master_main, NÃO gera notificação
+      if (currentUser?.id === '1' || currentUser?.name === 'Alex Master' || currentUser?.id === 'master_main') {
+          return;
+      }
+
+      // 2. Não notificar a si mesmo (ex: Admin editando algo que está no nome dele, se aplicável)
+      if (currentUser?.id === recipientId) return;
+
+      const newNotif: AppNotification = {
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          recipientId,
+          authorName: currentUser?.name || 'Administração',
+          title,
+          message,
+          isRead: false,
+          relatedEntityId
+      };
+
+      setNotifications(prev => [newNotif, ...prev]);
+
+      if (!isDemoMode) {
+          await supabase.from('notifications').insert(mapNotificationToDB(newNotif));
+      }
+  };
+
+  const handleMarkAsRead = async (id: string) => {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+      if (!isDemoMode) await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  };
+
+  const handleMarkAllAsRead = async () => {
+      const myNotifs = notifications.filter(n => n.recipientId === currentUser?.id && !n.isRead);
+      if (myNotifs.length === 0) return;
+      
+      setNotifications(prev => prev.map(n => n.recipientId === currentUser?.id ? { ...n, isRead: true } : n));
+      
+      if (!isDemoMode) {
+          // Atualiza em lote ou um por um (Supabase suporta update com filtro)
+          await supabase.from('notifications').update({ is_read: true }).eq('recipient_id', currentUser?.id);
+      }
+  };
+
   // --- CRUD Serviços & BAIXA DE ESTOQUE & DEVOLUÇÃO ---
   const handleSaveService = async (service: Service) => {
-    // 0. Capturar o estado ANTERIOR do serviço (para ver se tinha IMEI antes)
     const oldService = services.find(s => s.id === service.id);
 
-    // Optimistic Update (Atualiza UI primeiro)
+    // Optimistic Update
     setServices(prev => {
         const exists = prev.find(s => s.id === service.id);
         if (exists) return prev.map(s => s.id === service.id ? service : s);
         return [service, ...prev];
     });
 
+    // --- NOTIFICAÇÃO ---
+    // Se quem está salvando NÃO é o dono do serviço (ou seja, é um Master/Admin editando)
+    if (currentUser?.role !== UserRole.TECHNICIAN && service.technicianId !== currentUser?.id) {
+        if (!oldService) {
+            notifyTechnician(service.technicianId, "Novo Serviço Adicionado", `O serviço para ${service.customerName} (${service.plate}) foi adicionado em sua lista.`, service.id);
+        } else {
+            notifyTechnician(service.technicianId, "Serviço Alterado", `O serviço de ${service.customerName} (${service.plate}) sofreu alterações.`, service.id);
+        }
+    }
+
     if (isDemoMode) {
-        alert("Modo Demo: Serviço salvo localmente (sem lógica complexa de estoque).");
+        alert("Modo Demo: Serviço salvo localmente.");
         return;
     }
 
     try {
       const dbPayload = mapServiceToDB(service);
-
-      // 1. Salva o Serviço no Banco
       const { error } = oldService 
         ? await supabase.from('services').update(dbPayload).eq('id', service.id)
         : await supabase.from('services').insert(dbPayload);
 
       if (error) throw error;
 
-      // === LÓGICA DE ESTOQUE (INSTALAÇÃO) ===
-      
-      // A) Se removeu ou trocou o IMEI de instalação: Libera o antigo
+      // Lógica de Estoque (Instalação e Devolução) - Mantida igual
       if (oldService && oldService.imei && oldService.imei !== service.imei) {
           const oldTracker = trackers.find(t => t.imei === oldService.imei);
           if (oldTracker) {
-              const releasedTracker: Tracker = {
-                  ...oldTracker,
-                  status: TrackerStatus.DISPONIVEL,
-                  installationDate: undefined
-              };
+              const releasedTracker = { ...oldTracker, status: TrackerStatus.DISPONIVEL, installationDate: undefined };
               setTrackers(prev => prev.map(t => t.id === releasedTracker.id ? releasedTracker : t));
               await supabase.from('trackers').update(mapTrackerToDB(releasedTracker)).eq('id', releasedTracker.id);
           }
       }
 
-      // B) Se adicionou um novo IMEI de instalação: Baixa do estoque (INSTALADO)
       if (service.imei && (!oldService || oldService.imei !== service.imei)) {
          const tracker = trackers.find(t => t.imei === service.imei);
          if (tracker && tracker.status === TrackerStatus.DISPONIVEL) {
-             const updatedTracker: Tracker = { 
-               ...tracker, 
-               status: TrackerStatus.INSTALADO,
-               installationDate: service.date 
-             };
+             const updatedTracker = { ...tracker, status: TrackerStatus.INSTALADO, installationDate: service.date };
              setTrackers(prev => prev.map(t => t.id === tracker.id ? updatedTracker : t));
              await supabase.from('trackers').update(mapTrackerToDB(updatedTracker)).eq('id', tracker.id);
          }
       }
 
-      // === LÓGICA DE DEVOLUÇÃO (RETIRADA) ===
-      // Se o serviço tem equipamento retirado, esse equipamento deve ir para a lista "AGUARDANDO DEVOLUÇÃO"
       if (service.removedImei && service.removedModel) {
-          // Verifica se esse rastreador já existe no sistema (ex: estava instalado)
           const existingTracker = trackers.find(t => t.imei === service.removedImei);
-          
           if (existingTracker) {
-              // Atualiza para status DEVOLUCAO
-              const returnedTracker: Tracker = {
+              const returnedTracker = {
                   ...existingTracker,
                   status: TrackerStatus.DEVOLUCAO,
-                  model: service.removedModel, // Atualiza modelo caso esteja diferente
+                  model: service.removedModel,
                   company: service.removedCompany || existingTracker.company,
-                  technicianId: service.technicianId, // Garante que está com o técnico que retirou
+                  technicianId: service.technicianId,
                   technicianName: service.technicianName
               };
               setTrackers(prev => prev.map(t => t.id === returnedTracker.id ? returnedTracker : t));
               await supabase.from('trackers').update(mapTrackerToDB(returnedTracker)).eq('id', returnedTracker.id);
           } else {
-              // Se não existe, cria um novo rastreador já com status DEVOLUCAO
               const newReturnTracker: Tracker = {
                   id: Math.random().toString(36).substring(2) + Date.now().toString(36),
-                  date: service.date, // Data da retirada
+                  date: service.date,
                   model: service.removedModel,
                   imei: service.removedImei,
                   company: service.removedCompany || service.company,
@@ -209,50 +239,30 @@ const App: React.FC = () => {
 
     } catch (error: any) {
       console.error("Erro ao salvar serviço:", error);
-      
-      const msg = error.message || '';
-      
-      // TRATAMENTO ESPECÍFICO PARA FALTA DAS COLUNAS NOVAS
-      if (msg.includes("removed_imei") || msg.includes("has_exchange")) {
-         alert("ATENÇÃO: O banco de dados precisa ser atualizado!\n\nAs colunas de retirada não existem na tabela 'services'.\n\nPor favor, execute o SQL de atualização no Supabase.");
-      } else if (msg.includes("imei")) {
-         alert("ATENÇÃO: Coluna 'imei' faltando.");
-      } else {
-         alert(`Erro ao salvar no banco de dados: ${msg}`);
-      }
-      
       fetchAllData();
     }
   };
 
   const handleDeleteService = async (id: string) => {
-    // 1. Identificar o serviço a ser excluído
     const serviceToDelete = services.find(s => String(s.id) === String(id));
     
-    // 2. Atualização Otimista
+    // Notificação de Exclusão
+    if (serviceToDelete && currentUser?.role !== UserRole.TECHNICIAN && serviceToDelete.technicianId !== currentUser?.id) {
+        notifyTechnician(serviceToDelete.technicianId, "Serviço Removido", `O serviço de ${serviceToDelete.customerName} (${serviceToDelete.plate}) foi removido da sua lista.`);
+    }
+
     const previousServices = [...services];
     setServices(prev => prev.filter(s => String(s.id) !== String(id)));
 
-    // 3. Reversão de Estoque (Se tinha IMEI instalado, volta pra DISPONIVEL)
+    // Reversão de Estoque
     if (serviceToDelete && serviceToDelete.imei) {
         const tracker = trackers.find(t => t.imei === serviceToDelete.imei);
         if (tracker) {
-            const updatedTracker: Tracker = {
-                ...tracker,
-                status: TrackerStatus.DISPONIVEL,
-                installationDate: undefined
-            };
+            const updatedTracker = { ...tracker, status: TrackerStatus.DISPONIVEL, installationDate: undefined };
             setTrackers(prev => prev.map(t => t.id === tracker.id ? updatedTracker : t));
-            if (!isDemoMode) {
-                supabase.from('trackers').update(mapTrackerToDB(updatedTracker)).eq('id', tracker.id).then();
-            }
+            if (!isDemoMode) supabase.from('trackers').update(mapTrackerToDB(updatedTracker)).eq('id', tracker.id).then();
         }
     }
-
-    // 4. Reversão de Devolução (Se tinha IMEI retirado, o que fazer?)
-    // Por segurança, se excluímos o serviço de retirada, o equipamento "retirado" deveria tecnicamente voltar a ser "instalado" ou sumir.
-    // Para simplificar e evitar erros, vamos apenas apagar o registro de "Aguardando Devolução" se ele foi criado por este serviço?
-    // É complexo rastrear a origem. Vamos deixar o rastreador como está (DEVOLUCAO) e o usuário ajusta manualmente na aba Rastreadores se precisar.
 
     if (isDemoMode) return;
 
@@ -260,7 +270,6 @@ const App: React.FC = () => {
       const { error } = await supabase.from('services').delete().eq('id', id);
       if (error) throw error;
     } catch (error: any) {
-      alert(`Erro ao excluir no servidor: ${error.message}`);
       setServices(previousServices); 
       fetchAllData();
     }
@@ -268,11 +277,27 @@ const App: React.FC = () => {
 
   // --- CRUD Reembolsos ---
   const handleSaveReimbursement = async (reimbursement: Reimbursement) => {
+    const oldReimb = reimbursements.find(r => r.id === reimbursement.id);
+
     setReimbursements(prev => {
         const exists = prev.find(r => r.id === reimbursement.id);
         if (exists) return prev.map(r => r.id === reimbursement.id ? reimbursement : r);
         return [reimbursement, ...prev];
     });
+
+    // Notificação
+    if (currentUser?.role !== UserRole.TECHNICIAN && reimbursement.technicianId !== currentUser?.id) {
+         if (!oldReimb) {
+             notifyTechnician(reimbursement.technicianId, "Despesa Adicionada", `Uma nova despesa (${reimbursement.type}) foi lançada para você.`, reimbursement.id);
+         } else {
+             // Se mudou o status (ex: PAGO)
+             if (oldReimb.status !== reimbursement.status) {
+                 notifyTechnician(reimbursement.technicianId, `Status de Reembolso: ${reimbursement.status}`, `Sua despesa de ${reimbursement.description} agora está ${reimbursement.status}.`, reimbursement.id);
+             } else {
+                 notifyTechnician(reimbursement.technicianId, "Despesa Atualizada", `Os detalhes da despesa de ${reimbursement.description} foram atualizados.`, reimbursement.id);
+             }
+         }
+    }
 
     if (isDemoMode) return;
 
@@ -285,26 +310,24 @@ const App: React.FC = () => {
         : await supabase.from('reimbursements').insert(dbPayload);
 
       if (error) throw error;
-
-    } catch (error: any) { 
-        console.error(error);
-        alert(`Erro ao salvar reembolso: ${error.message}`);
-        fetchAllData(); // Reverte para dados do servidor
-    }
+    } catch (error) { fetchAllData(); }
   };
 
   const handleDeleteReimbursement = async (id: string) => {
+     const reimbToDelete = reimbursements.find(r => r.id === id);
+     if (reimbToDelete && currentUser?.role !== UserRole.TECHNICIAN && reimbToDelete.technicianId !== currentUser?.id) {
+         notifyTechnician(reimbToDelete.technicianId, "Despesa Removida", `A despesa ${reimbToDelete.description} foi removida.`);
+     }
+
      setReimbursements(prev => prev.filter(r => r.id !== id));
      if (isDemoMode) return;
-     try {
-       const { error } = await supabase.from('reimbursements').delete().eq('id', id);
-       if (error) throw error;
-     } catch (error) { console.error(error); }
+     try { await supabase.from('reimbursements').delete().eq('id', id); } catch (error) {}
   };
 
   // --- CRUD Rastreadores (Estoque) ---
   const handleSaveTracker = async (tracker: Tracker) => {
-     // Atualização Otimista (Visual)
+     const oldTracker = trackers.find(t => t.id === tracker.id);
+
      const previousTrackers = [...trackers];
      setTrackers(prev => {
         const exists = prev.find(t => t.id === tracker.id);
@@ -312,86 +335,62 @@ const App: React.FC = () => {
         return [tracker, ...prev];
      });
 
-     if (isDemoMode) {
-        alert("Modo Demo: Rastreador salvo localmente.");
-        return;
+     // Notificação de Estoque
+     if (currentUser?.role !== UserRole.TECHNICIAN && tracker.technicianId !== currentUser?.id) {
+         if (!oldTracker) {
+             notifyTechnician(tracker.technicianId, "Novo Equipamento", `O rastreador ${tracker.model} (IMEI: ${tracker.imei}) foi adicionado ao seu estoque.`, tracker.id);
+         } else {
+             // Se mudou o técnico dono
+             if (oldTracker.technicianId !== tracker.technicianId) {
+                 notifyTechnician(tracker.technicianId, "Transferência de Equipamento", `Você recebeu o rastreador ${tracker.model} (IMEI: ${tracker.imei}).`, tracker.id);
+             } 
+             // Se mudou status (ex: DEVOLVIDO)
+             else if (oldTracker.status !== tracker.status) {
+                 notifyTechnician(tracker.technicianId, `Status de Equipamento: ${tracker.status}`, `O rastreador IMEI ${tracker.imei} agora consta como ${tracker.status}.`, tracker.id);
+             }
+         }
      }
 
+     if (isDemoMode) return;
      try {
         const exists = previousTrackers.find(t => t.id === tracker.id);
         const dbPayload = mapTrackerToDB(tracker);
-        
         const { error } = exists 
             ? await supabase.from('trackers').update(dbPayload).eq('id', tracker.id)
             : await supabase.from('trackers').insert(dbPayload);
-
-        if (error) {
-            console.error("Erro Supabase:", error);
-            throw error;
-        }
-     } catch (error: any) { 
-         console.error("Erro ao salvar rastreador:", error);
-         
-         const msg = error.message || '';
-         const code = error.code || '';
-
-         // Alerta amigável para erro de tabela inexistente
-         if (msg.includes('Could not find the table') || msg.includes('relation "public.trackers" does not exist') || code === '42P01') {
-            alert(`ERRO CRÍTICO: A tabela 'trackers' não existe no seu banco de dados Supabase.\n\nPor favor, execute o comando SQL fornecido no chat para criar a tabela.`);
-         } 
-         // Alerta para coluna inexistente
-         else if (msg.includes('column') && msg.includes('does not exist')) {
-            alert(`ERRO DE ESTRUTURA: A tabela 'trackers' existe mas faltam colunas novas (company, installation_date).\n\nAtualize o banco de dados.`);
-         } else {
-            alert(`Erro ao salvar rastreador: ${msg}`);
-         }
-         
-         setTrackers(previousTrackers); // Reverte a alteração visual
-     }
+        if (error) throw error;
+     } catch (error) { setTrackers(previousTrackers); }
   };
 
   const handleDeleteTracker = async (id: string) => {
+      const trackerToDelete = trackers.find(t => t.id === id);
+      if (trackerToDelete && currentUser?.role !== UserRole.TECHNICIAN && trackerToDelete.technicianId !== currentUser?.id) {
+          notifyTechnician(trackerToDelete.technicianId, "Equipamento Removido", `O rastreador IMEI ${trackerToDelete.imei} foi removido do seu estoque.`);
+      }
+
       const previousTrackers = [...trackers];
       setTrackers(prev => prev.filter(t => t.id !== id));
-      
       if (isDemoMode) return;
-      
-      try {
-          const { error } = await supabase.from('trackers').delete().eq('id', id);
-          if (error) throw error;
-      } catch (error: any) { 
-          console.error(error);
-          alert(`Erro ao excluir rastreador: ${error.message}`);
-          setTrackers(previousTrackers);
-      }
+      try { await supabase.from('trackers').delete().eq('id', id); } catch (error) { setTrackers(previousTrackers); }
   };
 
-  // --- CRUD Usuários ---
   const handleSaveUser = async (user: User) => {
+    // Não vamos notificar alterações de usuário por enquanto, para simplificar.
     setUsers(prev => {
         const exists = prev.find(u => u.id === user.id);
         if (exists) return prev.map(u => u.id === user.id ? user : u);
         return [...prev, user];
     });
-    
     if (currentUser && currentUser.id === user.id) {
         setCurrentUser(user);
         localStorage.setItem('sc_session', JSON.stringify(user));
     }
-
     if (isDemoMode) return;
     try {
        const dbPayload = mapUserToDB(user);
        const exists = users.find(u => u.id === user.id);
-       const { error } = exists 
-            ? await supabase.from('users').update(dbPayload).eq('id', user.id)
-            : await supabase.from('users').insert(dbPayload);
-       
-       if (error) throw error;
-    } catch(e: any) { 
-        console.error(e);
-        alert(`Erro ao salvar usuário: ${e.message}`);
-    }
+       exists ? await supabase.from('users').update(dbPayload).eq('id', user.id) : await supabase.from('users').insert(dbPayload);
+    } catch(e) {}
   };
 
   const handleDeleteUser = async (id: string) => {
@@ -399,7 +398,7 @@ const App: React.FC = () => {
     if (!isDemoMode) await supabase.from('users').delete().eq('id', id);
   };
 
-  // Dados Visíveis
+  // Filtros de Visualização
   const visibleServices = useMemo(() => {
     if (!currentUser) return [];
     if (currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN) {
@@ -415,22 +414,25 @@ const App: React.FC = () => {
     return reimbursements.filter(r => r.technicianId === currentUser.id);
   }, [reimbursements, currentUser]);
 
-  const visibleTrackers = useMemo(() => {
-      if (!currentUser) return [];
-      // Filtros de técnico/admin são aplicados dentro do componente Trackers.tsx para flexibilidade
-      return trackers; 
-  }, [trackers, currentUser]);
+  const visibleTrackers = useMemo(() => trackers, [trackers]);
 
   const dashboardServices = useMemo(() => {
     if (!currentUser) return [];
-    if (currentUser.role === UserRole.TECHNICIAN) {
-      return services.filter(s => s.technicianId === currentUser.id);
-    }
-    if (viewingTechnicianId) {
-      return services.filter(s => s.technicianId === viewingTechnicianId);
-    }
+    if (currentUser.role === UserRole.TECHNICIAN) return services.filter(s => s.technicianId === currentUser.id);
+    if (viewingTechnicianId) return services.filter(s => s.technicianId === viewingTechnicianId);
     return services;
   }, [services, currentUser, viewingTechnicianId]);
+
+  // Contagem de notificações não lidas
+  const unreadCount = useMemo(() => {
+      return notifications.filter(n => n.recipientId === currentUser?.id && !n.isRead).length;
+  }, [notifications, currentUser]);
+
+  // Filtrar notificações do usuário atual para passar ao painel
+  const myNotifications = useMemo(() => {
+      return notifications.filter(n => n.recipientId === currentUser?.id);
+  }, [notifications, currentUser]);
+
 
   if (loading) {
     return (
@@ -455,71 +457,28 @@ const App: React.FC = () => {
   }
 
   const renderContent = () => {
-    if (!currentUser) return null;
-
     switch (activeTab) {
       case 'dashboard':
-        return (
-          <Dashboard 
-            services={dashboardServices} 
-            currentUser={currentUser} 
-            users={users} 
-            viewingTechnicianId={viewingTechnicianId}
-            onViewTechnician={(id) => {
-                setViewingTechnicianId(id);
-                setActiveTab('services');
-            }}
-            trackers={trackers}
-          />
-        );
+        return <Dashboard services={dashboardServices} currentUser={currentUser} users={users} viewingTechnicianId={viewingTechnicianId} onViewTechnician={(id) => { setViewingTechnicianId(id); setActiveTab('services'); }} trackers={trackers} />;
       case 'services':
-        return (
-          <Services 
-            services={visibleServices} 
-            currentUser={currentUser} 
-            users={users}
-            onSaveService={handleSaveService}
-            onDeleteService={handleDeleteService}
-            viewingTechnicianId={viewingTechnicianId}
-            onClearFilter={() => setViewingTechnicianId(null)}
-            onFilterByTech={(id) => setViewingTechnicianId(id)}
-            trackers={trackers} // Prop passada para busca de estoque
-          />
-        );
+        return <Services services={visibleServices} currentUser={currentUser} users={users} onSaveService={handleSaveService} onDeleteService={handleDeleteService} viewingTechnicianId={viewingTechnicianId} onClearFilter={() => setViewingTechnicianId(null)} onFilterByTech={(id) => setViewingTechnicianId(id)} trackers={trackers} />;
       case 'trackers':
-        return (
-          <Trackers
-            trackers={visibleTrackers}
-            currentUser={currentUser}
-            users={users}
-            onSaveTracker={handleSaveTracker}
-            onDeleteTracker={handleDeleteTracker}
-          />
-        );
+        return <Trackers trackers={visibleTrackers} currentUser={currentUser} users={users} onSaveTracker={handleSaveTracker} onDeleteTracker={handleDeleteTracker} />;
       case 'reimbursements':
-        return (
-          <Reimbursements
-            reimbursements={visibleReimbursements}
-            currentUser={currentUser}
-            users={users}
-            onSaveReimbursement={handleSaveReimbursement}
-            onDeleteReimbursement={handleDeleteReimbursement}
-          />
-        );
+        return <Reimbursements reimbursements={visibleReimbursements} currentUser={currentUser} users={users} onSaveReimbursement={handleSaveReimbursement} onDeleteReimbursement={handleDeleteReimbursement} />;
       case 'users':
         if (currentUser.role !== UserRole.MASTER) return <div className="p-4 md:p-8">Acesso restrito.</div>;
         return <Users users={users} onSaveUser={handleSaveUser} onDeleteUser={handleDeleteUser} />;
       case 'profile':
         return <Profile user={currentUser} onUpdateUser={handleSaveUser} />;
-      default:
-        return <Dashboard services={dashboardServices} currentUser={currentUser} users={users} viewingTechnicianId={viewingTechnicianId} onViewTechnician={(id) => setViewingTechnicianId(id)} />;
+      default: return null;
     }
   };
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
       
-      {/* ALERTA DE MODO DEMO - FIXO NO TOPO */}
+      {/* ALERTA DE MODO DEMO */}
       {isDemoMode && (
          <div className="fixed top-0 left-0 right-0 z-[100] bg-rose-600 text-white px-4 py-3 text-center shadow-lg animate-in slide-in-from-top flex items-center justify-center">
             <Database className="mr-2 animate-pulse" size={18} />
@@ -532,7 +491,17 @@ const App: React.FC = () => {
 
       {currentUser && <MonthlyReminder currentUser={currentUser} />}
       {currentUser && <ReimbursementIntro />}
+      
+      {/* PAINEL DE NOTIFICAÇÕES (SLIDE OVER) */}
+      <NotificationsPanel 
+         isOpen={isNotificationsOpen} 
+         onClose={() => setIsNotificationsOpen(false)} 
+         notifications={myNotifications}
+         onMarkAsRead={handleMarkAsRead}
+         onMarkAllAsRead={handleMarkAllAsRead}
+      />
 
+      {/* HEADER MOBILE */}
       <div className={`md:hidden fixed left-0 right-0 h-20 bg-white border-b border-slate-100 z-40 flex items-center justify-between px-6 shadow-sm ${isDemoMode ? 'top-14' : 'top-0'}`}>
         <div className="flex items-center space-x-3">
           <Logo size={32} />
@@ -546,29 +515,57 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-        <button 
-          onClick={() => setIsMobileMenuOpen(true)} 
-          className="p-2 text-slate-600 hover:bg-slate-50 rounded-xl"
-        >
-          <Menu size={28} />
-        </button>
+        <div className="flex items-center space-x-2">
+            <button 
+               onClick={() => setIsNotificationsOpen(true)}
+               className="p-2 text-slate-600 hover:bg-slate-50 rounded-xl relative"
+            >
+               <Bell size={24} />
+               {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full"></span>
+               )}
+            </button>
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)} 
+              className="p-2 text-slate-600 hover:bg-slate-50 rounded-xl"
+            >
+              <Menu size={28} />
+            </button>
+        </div>
       </div>
 
       <Sidebar 
         activeTab={activeTab} 
-        setActiveTab={(tab) => {
-            setActiveTab(tab);
-            setIsMobileMenuOpen(false); 
-        }} 
+        setActiveTab={(tab) => { setActiveTab(tab); setIsMobileMenuOpen(false); }} 
         currentUser={currentUser}
         onLogout={handleLogout}
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
       />
 
-      <main className={`flex-1 overflow-y-auto pt-20 md:pt-0 transition-all duration-300 ${isDemoMode ? 'mt-14 md:mt-14' : ''}`}>
-        {renderContent()}
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+          
+          {/* HEADER DESKTOP (Agora inclui o botão de Notificação) */}
+          <header className={`hidden md:flex items-center justify-end px-8 py-4 bg-white/50 backdrop-blur-sm z-30 ${isDemoMode ? 'mt-14' : ''}`}>
+              <button 
+                 onClick={() => setIsNotificationsOpen(true)}
+                 className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-500 hover:text-[#00AEEF] hover:shadow-lg transition-all relative group"
+                 title="Notificações"
+              >
+                 <Bell size={20} className="group-hover:scale-110 transition-transform" />
+                 {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 border-2 border-white"></span>
+                    </span>
+                 )}
+              </button>
+          </header>
+
+          <main className={`flex-1 overflow-y-auto pt-20 md:pt-0 transition-all duration-300 relative`}>
+            {renderContent()}
+          </main>
+      </div>
     </div>
   );
 };

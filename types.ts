@@ -112,3 +112,14 @@ export interface Tracker {
   technicianName: string;
   installationDate?: string; // Data em que foi instalado
 }
+
+export interface AppNotification {
+  id: string;
+  createdAt: string;
+  recipientId: string; // Técnico que recebe a msg
+  authorName: string; // Quem fez a alteração
+  title: string;
+  message: string;
+  isRead: boolean;
+  relatedEntityId?: string; // ID do serviço/rastreador opcional
+}
