@@ -94,6 +94,19 @@ const Trackers: React.FC<TrackersProps> = ({
       alert("Preencha Data, Modelo e IMEI.");
       return;
     }
+
+    // VERIFICAÇÃO DE DUPLICIDADE DE IMEI
+    // Procura se existe algum rastreador com o mesmo IMEI, excluindo o próprio (caso esteja editando)
+    const duplicate = trackers.find(t => 
+        t.imei === formData.imei && 
+        t.id !== (editingTracker?.id || '')
+    );
+
+    if (duplicate) {
+        alert(`ERRO: O IMEI ${formData.imei} já está cadastrado no sistema (Técnico: ${duplicate.technicianName}).`);
+        return;
+    }
+
     setIsSaving(true);
     
     const idToUse = editingTracker ? editingTracker.id : (self.crypto.randomUUID ? self.crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36));
@@ -338,7 +351,26 @@ const Trackers: React.FC<TrackersProps> = ({
                         <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">IMEI</label>
                         <div className="relative">
                             <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input type="text" placeholder="Apenas números" className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900" value={formData.imei} onChange={(e) => setFormData({...formData, imei: e.target.value.replace(/\D/g, '')})} />
+                            <input 
+                              type="text" 
+                              placeholder="Apenas números" 
+                              className="w-full pl-12 pr-16 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900" 
+                              value={formData.imei} 
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                if(val.length <= 25) setFormData({...formData, imei: val});
+                              }} 
+                            />
+                            {/* Contador de Dígitos */}
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <span className={`text-[10px] font-black px-2 py-1 rounded-md ${
+                                    (formData.imei?.length || 0) === 15 
+                                    ? 'bg-emerald-100 text-emerald-600' 
+                                    : 'bg-slate-200 text-slate-500'
+                                }`}>
+                                    {formData.imei?.length || 0}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
