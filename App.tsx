@@ -1,9 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, UserRole, Service, ServiceStatus, Reimbursement } from './types';
+import { User, UserRole, Service, ServiceStatus, Reimbursement, Tracker, TrackerStatus } from './types';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Services from './components/Services';
+import Trackers from './components/Trackers';
 import Reimbursements from './components/Reimbursements';
 import Users from './components/Users';
 import Profile from './components/Profile';
@@ -11,15 +12,16 @@ import Login from './components/Login';
 import Logo from './components/Logo';
 import MonthlyReminder from './components/MonthlyReminder';
 import ReimbursementIntro from './components/ReimbursementIntro';
-import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB, mapReimbursementFromDB, mapReimbursementToDB } from './lib/supabase';
-import { MOCK_USERS, MOCK_REIMBURSEMENTS } from './constants';
+import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB, mapReimbursementFromDB, mapReimbursementToDB, mapTrackerFromDB, mapTrackerToDB } from './lib/supabase';
+import { MOCK_USERS, MOCK_REIMBURSEMENTS, MOCK_TRACKERS, MOCK_SERVICES } from './constants';
 import { Loader2, Menu, AlertTriangle, Database } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'reimbursements' | 'users' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'reimbursements' | 'users' | 'profile' | 'trackers'>('dashboard');
   const [services, setServices] = useState<Service[]>([]);
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
+  const [trackers, setTrackers] = useState<Tracker[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [viewingTechnicianId, setViewingTechnicianId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +56,8 @@ const App: React.FC = () => {
           setIsDemoMode(true);
           setUsers(MOCK_USERS);
           setReimbursements(MOCK_REIMBURSEMENTS);
+          setTrackers(MOCK_TRACKERS);
+          setServices(MOCK_SERVICES);
       } else if (usersError) {
           throw usersError;
       } else {
@@ -65,35 +69,33 @@ const App: React.FC = () => {
         }
       }
 
-      // Buscar Serviços
+      // Buscar Serviços, Reembolsos e Rastreadores
       if (!isDemoMode) {
           const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').order('date', { ascending: false });
           if (!servicesError && servicesData) {
               setServices(servicesData.map(mapServiceFromDB));
           }
 
-          // Buscar Reembolsos
           const { data: reimbData, error: reimbError } = await supabase.from('reimbursements').select('*').order('date', { ascending: false });
-          if (reimbError) {
-              console.error("Erro ao buscar reembolsos:", reimbError);
-              if (reimbError.code === '42P01') { 
-                console.warn("Tabela 'reimbursements' não encontrada.");
-                setReimbursements([]);
-              }
-          } else if (reimbData) {
+          if (!reimbError && reimbData) {
               setReimbursements(reimbData.map(mapReimbursementFromDB));
           }
-      } else {
-          // Se estiver em modo demo, zera os serviços para não confundir o usuário com dados falsos
-          // ou mantenha vazio para ele começar a preencher
-          setServices([]);
-      }
+
+          const { data: trackersData, error: trackersError } = await supabase.from('trackers').select('*').order('date', { ascending: false });
+          if (!trackersError && trackersData) {
+              setTrackers(trackersData.map(mapTrackerFromDB));
+          } else {
+             // Caso a tabela ainda não exista no Supabase
+             setTrackers([]);
+          }
+      } 
       
       setDbError(null);
     } catch (error: any) {
       console.error("Erro ao conectar com banco:", error);
       setIsDemoMode(true);
       setUsers(prev => prev.length > 0 ? prev : MOCK_USERS);
+      setTrackers(MOCK_TRACKERS); // Fallback
     }
   };
 
@@ -109,18 +111,32 @@ const App: React.FC = () => {
     setViewingTechnicianId(null);
   };
 
-  // --- CRUD Serviços ---
+  // --- CRUD Serviços & BAIXA DE ESTOQUE ---
   const handleSaveService = async (service: Service) => {
     try {
       if (isDemoMode) {
-          alert("ATENÇÃO: Você está em MODO DE TESTE. \n\nEsse serviço NÃO SERÁ SALVO de verdade porque a Chave API do Supabase ainda não foi configurada. \n\nAtualize a chave no arquivo 'lib/supabase.ts' para salvar permanentemente.");
-          setServices(prev => [service, ...prev]); 
+          alert("Modo Demo: Serviço salvo localmente.");
+          setServices(prev => {
+              const exists = prev.find(s => s.id === service.id);
+              if (exists) return prev.map(s => s.id === service.id ? service : s);
+              return [service, ...prev];
+          });
+          
+          // Simula baixa de estoque no modo demo
+          if (service.imei) {
+             setTrackers(prev => prev.map(t => t.imei === service.imei ? { 
+                ...t, 
+                status: TrackerStatus.INSTALADO,
+                installationDate: service.date // Salva data de instalação
+             } : t));
+          }
           return;
       }
 
       const exists = services.find(s => s.id === service.id);
       const dbPayload = mapServiceToDB(service);
 
+      // 1. Salva o Serviço
       if (exists) {
         setServices(prev => prev.map(s => s.id === service.id ? service : s));
         await supabase.from('services').update(dbPayload).eq('id', service.id);
@@ -128,8 +144,31 @@ const App: React.FC = () => {
         setServices(prev => [service, ...prev]);
         await supabase.from('services').insert(dbPayload);
       }
+
+      // 2. Lógica de Baixa de Estoque Automática (Vincular Equipamento)
+      if (service.imei) {
+         // Procura o rastreador pelo IMEI
+         const tracker = trackers.find(t => t.imei === service.imei);
+         
+         // Se encontrar e ele estiver disponível, atualiza para INSTALADO
+         if (tracker && tracker.status === TrackerStatus.DISPONIVEL) {
+             const updatedTracker: Tracker = { 
+               ...tracker, 
+               status: TrackerStatus.INSTALADO,
+               installationDate: service.date // Salva data de instalação 
+             };
+             
+             // Atualiza estado local
+             setTrackers(prev => prev.map(t => t.id === tracker.id ? updatedTracker : t));
+             
+             // Atualiza no banco
+             await supabase.from('trackers').update(mapTrackerToDB(updatedTracker)).eq('id', tracker.id);
+             console.log(`Baixa de estoque efetuada para IMEI ${service.imei}`);
+         }
+      }
+
     } catch (error) {
-      console.error("Aviso: Dados salvos apenas localmente (Erro de API).", error);
+      console.error("Erro ao salvar serviço ou atualizar estoque:", error);
     }
   };
 
@@ -143,59 +182,30 @@ const App: React.FC = () => {
       const { error } = await supabase.from('services').delete().eq('id', id);
       if (error) throw error;
     } catch (error: any) {
-      const isAuthError = error.message?.includes('JWT') || error.code === '401' || error.message?.includes('API key');
-      if (!isAuthError) {
-          alert(`Erro ao excluir no servidor: ${error.message}. Revertendo ação.`);
-          setServices(previousServices);
-      }
+      alert(`Erro ao excluir no servidor: ${error.message}`);
+      setServices(previousServices);
     }
   };
 
   // --- CRUD Reembolsos ---
   const handleSaveReimbursement = async (reimbursement: Reimbursement) => {
-    // Verificar se é uma edição ou criação
     const exists = reimbursements.find(r => r.id === reimbursement.id);
-
-    if (isDemoMode) {
-        if (exists) {
-            setReimbursements(prev => prev.map(r => r.id === reimbursement.id ? reimbursement : r));
-        } else {
-            setReimbursements(prev => [reimbursement, ...prev]);
-        }
-        alert("Modo Demo: Salvo localmente.");
-        return;
-    }
-
-    // Atualização Otimista
     if (exists) {
         setReimbursements(prev => prev.map(r => r.id === reimbursement.id ? reimbursement : r));
     } else {
         setReimbursements(prev => [reimbursement, ...prev]);
     }
 
+    if (isDemoMode) return;
+
     try {
       const dbPayload = mapReimbursementToDB(reimbursement);
-      
-      let error;
       if (exists) {
-         // UPDATE
-         const { error: updateError } = await supabase.from('reimbursements').update(dbPayload).eq('id', reimbursement.id);
-         error = updateError;
+         await supabase.from('reimbursements').update(dbPayload).eq('id', reimbursement.id);
       } else {
-         // INSERT
-         const { error: insertError } = await supabase.from('reimbursements').insert(dbPayload);
-         error = insertError;
+         await supabase.from('reimbursements').insert(dbPayload);
       }
-
-      if (error) {
-        throw error;
-      }
-    } catch (error: any) {
-      console.error("Erro ao salvar reembolso no banco:", error);
-      
-      // Reverte em caso de erro (recuperar estado anterior seria o ideal, mas aqui vamos alertar)
-      alert("Erro ao salvar no banco de dados. Verifique sua conexão.");
-    }
+    } catch (error) { console.error(error); }
   };
 
   const handleDeleteReimbursement = async (id: string) => {
@@ -206,40 +216,61 @@ const App: React.FC = () => {
      } catch (error) { console.error(error); }
   };
 
+  // --- CRUD Rastreadores (Estoque) ---
+  const handleSaveTracker = async (tracker: Tracker) => {
+     const exists = trackers.find(t => t.id === tracker.id);
+     
+     if (exists) {
+        setTrackers(prev => prev.map(t => t.id === tracker.id ? tracker : t));
+     } else {
+        setTrackers(prev => [tracker, ...prev]);
+     }
+
+     if (isDemoMode) return;
+
+     try {
+        const dbPayload = mapTrackerToDB(tracker);
+        if (exists) {
+            await supabase.from('trackers').update(dbPayload).eq('id', tracker.id);
+        } else {
+            await supabase.from('trackers').insert(dbPayload);
+        }
+     } catch (error) { console.error(error); }
+  };
+
+  const handleDeleteTracker = async (id: string) => {
+      setTrackers(prev => prev.filter(t => t.id !== id));
+      if (isDemoMode) return;
+      try {
+          await supabase.from('trackers').delete().eq('id', id);
+      } catch (error) { console.error(error); }
+  };
+
   // --- CRUD Usuários ---
   const handleSaveUser = async (user: User) => {
-    if (isDemoMode) {
-        setUsers(prev => [...prev, user]);
-        return;
-    }
-    try {
-      const exists = users.find(u => u.id === user.id);
-      const dbPayload = mapUserToDB(user);
-
-      if (exists) {
+    const exists = users.find(u => u.id === user.id);
+    if (exists) {
         setUsers(prev => prev.map(u => u.id === user.id ? user : u));
-        await supabase.from('users').update(dbPayload).eq('id', user.id);
-        
-        if (currentUser && currentUser.id === user.id) {
-           setCurrentUser(user);
-           localStorage.setItem('sc_session', JSON.stringify(user));
-        }
-      } else {
+    } else {
         setUsers(prev => [...prev, user]);
-        await supabase.from('users').insert(dbPayload);
-      }
-    } catch (error) {
-      console.error("Salvo localmente apenas.", error);
     }
+    
+    if (currentUser && currentUser.id === user.id) {
+        setCurrentUser(user);
+        localStorage.setItem('sc_session', JSON.stringify(user));
+    }
+
+    if (isDemoMode) return;
+    try {
+       const dbPayload = mapUserToDB(user);
+       if (exists) await supabase.from('users').update(dbPayload).eq('id', user.id);
+       else await supabase.from('users').insert(dbPayload);
+    } catch(e) { console.error(e); }
   };
 
   const handleDeleteUser = async (id: string) => {
-    try {
-      setUsers(prev => prev.filter(u => u.id !== id));
-      if (!isDemoMode) await supabase.from('users').delete().eq('id', id);
-    } catch (error) {
-      console.error("Excluído localmente apenas.", error);
-    }
+    setUsers(prev => prev.filter(u => u.id !== id));
+    if (!isDemoMode) await supabase.from('users').delete().eq('id', id);
   };
 
   // Dados Visíveis
@@ -254,11 +285,15 @@ const App: React.FC = () => {
 
   const visibleReimbursements = useMemo(() => {
     if (!currentUser) return [];
-    if (currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN) {
-      return reimbursements;
-    }
+    if (currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN) return reimbursements;
     return reimbursements.filter(r => r.technicianId === currentUser.id);
   }, [reimbursements, currentUser]);
+
+  const visibleTrackers = useMemo(() => {
+      if (!currentUser) return [];
+      // Filtros de técnico/admin são aplicados dentro do componente Trackers.tsx para flexibilidade
+      return trackers; 
+  }, [trackers, currentUser]);
 
   const dashboardServices = useMemo(() => {
     if (!currentUser) return [];
@@ -308,6 +343,7 @@ const App: React.FC = () => {
                 setViewingTechnicianId(id);
                 setActiveTab('services');
             }}
+            trackers={trackers}
           />
         );
       case 'services':
@@ -321,6 +357,17 @@ const App: React.FC = () => {
             viewingTechnicianId={viewingTechnicianId}
             onClearFilter={() => setViewingTechnicianId(null)}
             onFilterByTech={(id) => setViewingTechnicianId(id)}
+            trackers={trackers} // Prop passada para busca de estoque
+          />
+        );
+      case 'trackers':
+        return (
+          <Trackers
+            trackers={visibleTrackers}
+            currentUser={currentUser}
+            users={users}
+            onSaveTracker={handleSaveTracker}
+            onDeleteTracker={handleDeleteTracker}
           />
         );
       case 'reimbursements':

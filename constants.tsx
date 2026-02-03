@@ -1,5 +1,5 @@
 
-import { User, UserRole, Service, ServiceStatus, ServiceType, Company, CancelledBy, Reimbursement, ReimbursementType, ReimbursementStatus } from './types';
+import { User, UserRole, Service, ServiceStatus, ServiceType, Company, CancelledBy, Reimbursement, ReimbursementType, ReimbursementStatus, Tracker, TrackerStatus } from './types';
 
 export const MOCK_USERS: User[] = [
   // Usuários Administrativos
@@ -28,7 +28,8 @@ export const MOCK_SERVICES: Service[] = [
     value: 50,
     status: ServiceStatus.REALIZADO,
     technicianId: '3',
-    technicianName: 'José Técnico'
+    technicianName: 'José Técnico',
+    imei: '865432051234567'
   },
   {
     id: 's2',
@@ -104,6 +105,36 @@ export const MOCK_REIMBURSEMENTS: Reimbursement[] = [
     description: 'Fita isolante e conectores',
     value: 45.00,
     status: ReimbursementStatus.PAGO,
+    technicianId: '4',
+    technicianName: 'Lucas Silva'
+  }
+];
+
+export const MOCK_TRACKERS: Tracker[] = [
+  {
+    id: 't1',
+    date: '2024-01-20',
+    model: 'FMB920',
+    imei: '865432050000001',
+    status: TrackerStatus.DISPONIVEL,
+    technicianId: '3',
+    technicianName: 'José Técnico'
+  },
+  {
+    id: 't2',
+    date: '2024-01-22',
+    model: 'GV50',
+    imei: '865432050000002',
+    status: TrackerStatus.DISPONIVEL,
+    technicianId: '3',
+    technicianName: 'José Técnico'
+  },
+  {
+    id: 't3',
+    date: '2024-01-25',
+    model: 'FMB920',
+    imei: '865432050000003',
+    status: TrackerStatus.INSTALADO,
     technicianId: '4',
     technicianName: 'Lucas Silva'
   }

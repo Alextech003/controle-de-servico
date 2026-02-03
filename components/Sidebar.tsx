@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, ClipboardList, Users, UserCircle, LogOut, X, Receipt } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Users, UserCircle, LogOut, X, Receipt, Radio } from 'lucide-react';
 import { User, UserRole } from '../types';
 import Logo from './Logo';
 
@@ -17,6 +17,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser,
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'services', label: 'Serviços', icon: ClipboardList },
+    { id: 'trackers', label: 'Rastreadores', icon: Radio },
     { id: 'reimbursements', label: 'Reembolsos', icon: Receipt },
     { id: 'users', label: 'Usuários', icon: Users, restricted: [UserRole.TECHNICIAN, UserRole.ADMIN] },
     { id: 'profile', label: 'Perfil', icon: UserCircle },

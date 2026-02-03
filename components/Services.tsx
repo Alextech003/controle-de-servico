@@ -5,11 +5,11 @@ import {
   MessageSquare, Table as TableIcon,
   ArrowRight, CopyPlus, Loader2,
   Users as UsersIcon, Check, XCircle, ChevronLeft, ChevronRight,
-  MapPin, CalendarDays, Car
+  MapPin, CalendarDays, Car, Barcode, Box, DollarSign
 } from 'lucide-react';
 import { 
   Service, ServiceStatus, ServiceType, Company, 
-  User, UserRole, CancelledBy 
+  User, UserRole, CancelledBy, Tracker, TrackerStatus
 } from '../types';
 
 interface ServicesProps {
@@ -21,15 +21,19 @@ interface ServicesProps {
   viewingTechnicianId: string | null;
   onClearFilter: () => void;
   onFilterByTech: (id: string) => void;
+  trackers?: Tracker[];
 }
 
 const Services: React.FC<ServicesProps> = ({ 
   services, currentUser, users, onSaveService, onDeleteService, 
-  viewingTechnicianId, onClearFilter, onFilterByTech
+  viewingTechnicianId, onClearFilter, onFilterByTech, trackers = []
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [viewingReason, setViewingReason] = useState<Service | null>(null);
+  
+  // Controle do Autocomplete do IMEI
+  const [showImeiSuggestions, setShowImeiSuggestions] = useState(false);
   
   // Estado para controlar qual item está sendo deletado (confirmação visual)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -77,10 +81,46 @@ const Services: React.FC<ServicesProps> = ({
     vehicle: '',
     plate: '',
     cancellationReason: '',
-    cancelledBy: undefined
+    cancelledBy: undefined,
+    imei: ''
   };
 
   const [formData, setFormData] = useState<Partial<Service>>(initialFormState);
+
+  // Lógica de Autocomplete do IMEI
+  const suggestedTrackers = useMemo(() => {
+    // Se não tiver digitando nada, não mostra
+    if (!formData.imei) return [];
+
+    // Identifica quem é o técnico responsável pelo serviço atual
+    // Se for um novo serviço, é o usuário atual (ou o admin não está filtrando)
+    // Se for edição, é o técnico dono do serviço
+    const targetTechId = editingService ? editingService.technicianId : (viewingTechnicianId || currentUser.id);
+
+    return trackers.filter(t => 
+      t.status === TrackerStatus.DISPONIVEL && // Só disponíveis
+      t.technicianId === targetTechId && // Só do estoque do técnico
+      t.imei.includes(formData.imei!) // Que contém o texto digitado
+    ).slice(0, 5); // Limita a 5 sugestões
+  }, [trackers, formData.imei, editingService, viewingTechnicianId, currentUser.id]);
+
+  const handleSelectImei = (tracker: Tracker) => {
+    setFormData({ ...formData, imei: tracker.imei });
+    setShowImeiSuggestions(false);
+  };
+
+  // Funções de Máscara de Moeda (Igual a Reimbursements)
+  const formatCurrencyValue = (value: number) => {
+    if (value === undefined || value === null) return '0,00';
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let rawValue = e.target.value.replace(/\D/g, '');
+    if (!rawValue) rawValue = '0';
+    const floatValue = parseInt(rawValue, 10) / 100;
+    setFormData({ ...formData, value: floatValue });
+  };
 
   const filteredServices = useMemo(() => {
     return services.filter(s => {
@@ -130,9 +170,9 @@ const Services: React.FC<ServicesProps> = ({
   };
 
   const handleExportExcel = () => {
-    const headers = "Data;Cliente;Bairro;Tipo;Empresa;Veículo;Placa;Valor;Status;Técnico\n";
+    const headers = "Data;Cliente;Bairro;Tipo;Empresa;Veículo;Placa;Valor;Status;IMEI;Técnico\n";
     const csv = filteredServices.map(s => 
-      `${s.date};${s.customerName};${s.neighborhood};${s.type};${s.company};${s.vehicle};${s.plate};${s.value.toFixed(2)};${s.status};${s.technicianName}`
+      `${s.date};${s.customerName};${s.neighborhood};${s.type};${s.company};${s.vehicle};${s.plate};${s.value.toFixed(2)};${s.status};${s.imei || ''};${s.technicianName}`
     ).join("\n");
     const blob = new Blob(["\ufeff" + headers + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
@@ -164,7 +204,8 @@ const Services: React.FC<ServicesProps> = ({
       setFormData(prev => ({
         ...prev,
         vehicle: '', 
-        plate: ''    
+        plate: '',
+        imei: ''    
       }));
       setEditingService(null); 
     } else { 
@@ -401,9 +442,61 @@ const Services: React.FC<ServicesProps> = ({
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Placa *</label>
                   <input type="text" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-[#00AEEF] text-slate-900 font-black uppercase" value={formData.plate || ''} onChange={(e) => setFormData({...formData, plate: e.target.value.toUpperCase()})} />
                 </div>
+                <div className="relative">
+                  <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">IMEI Equipamento</label>
+                  <div className="relative z-20">
+                     <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                     <input 
+                        type="text" 
+                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-[#00AEEF] text-slate-900 font-black" 
+                        placeholder="Digite o IMEI..." 
+                        value={formData.imei || ''} 
+                        onChange={(e) => {
+                           setFormData({...formData, imei: e.target.value.replace(/\D/g, '')});
+                           setShowImeiSuggestions(true);
+                        }} 
+                        onFocus={() => setShowImeiSuggestions(true)}
+                     />
+                     
+                     {/* DROPDOWN DE SUGESTÕES DE ESTOQUE */}
+                     {showImeiSuggestions && suggestedTrackers.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                           <div className="px-4 py-2 bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                              Estoque Disponível
+                           </div>
+                           {suggestedTrackers.map((tracker) => (
+                              <button
+                                 key={tracker.id}
+                                 onClick={() => handleSelectImei(tracker)}
+                                 className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center justify-between group border-b border-slate-50 last:border-0"
+                              >
+                                 <div className="flex items-center space-x-3">
+                                    <Box size={16} className="text-slate-400 group-hover:text-[#00AEEF]" />
+                                    <div>
+                                       <p className="text-xs font-black text-slate-700 group-hover:text-[#00AEEF]">{tracker.imei}</p>
+                                       <p className="text-[10px] font-bold text-slate-400 uppercase">{tracker.model}</p>
+                                    </div>
+                                 </div>
+                                 <ArrowRight size={14} className="text-slate-300 group-hover:text-[#00AEEF]" />
+                              </button>
+                           ))}
+                        </div>
+                     )}
+                  </div>
+                  {formData.imei && <p className="text-[9px] text-blue-500 mt-1 ml-1 font-bold">O equipamento será baixado do estoque automaticamente.</p>}
+                </div>
                 <div>
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Valor do Serviço R$ *</label>
-                  <input type="number" step="0.01" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-[#00AEEF] text-slate-900 font-black" value={formData.value} onChange={(e) => setFormData({...formData, value: parseFloat(e.target.value) || 0})} />
+                  <div className="relative">
+                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-[#00AEEF] text-slate-900 font-black" 
+                        value={formatCurrencyValue(formData.value || 0)} 
+                        onChange={handleCurrencyChange} 
+                      />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Empresa</label>
@@ -417,7 +510,7 @@ const Services: React.FC<ServicesProps> = ({
                     {Object.values(ServiceType).map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
-                <div>
+                <div className="md:col-span-3">
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Status Final *</label>
                   <select className={`w-full px-5 py-4 border-2 rounded-2xl outline-none font-black ${formData.status === ServiceStatus.REALIZADO ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`} value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value as ServiceStatus})}>
                     <option value={ServiceStatus.REALIZADO}>REALIZADO</option>

@@ -1,13 +1,14 @@
+
 import React, { useState, useMemo } from 'react';
 import { 
   Truck, CheckCircle2, DollarSign, XCircle, 
-  ChevronLeft, ChevronRight, TrendingUp, FileText, PieChart, BarChart3
+  ChevronLeft, ChevronRight, TrendingUp, FileText, PieChart, BarChart3, Radio
 } from 'lucide-react';
 import { 
   ResponsiveContainer, PieChart as RePieChart, Pie, Cell, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip
 } from 'recharts';
-import { Service, ServiceStatus, User, UserRole, Company, ServiceType, CancelledBy } from '../types';
+import { Service, ServiceStatus, User, UserRole, Company, ServiceType, CancelledBy, Tracker, TrackerStatus } from '../types';
 
 interface DashboardProps {
   services: Service[];
@@ -15,9 +16,10 @@ interface DashboardProps {
   users: User[];
   viewingTechnicianId: string | null;
   onViewTechnician: (id: string) => void;
+  trackers?: Tracker[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, viewingTechnicianId }) => {
+const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, viewingTechnicianId, trackers = [] }) => {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -67,8 +69,20 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
       .filter(s => s.status === ServiceStatus.CANCELADO && s.cancelledBy === CancelledBy.TECNICO)
       .length * 50;
 
-    return { total, realized, cancelled, revenue: grossRevenue - techPenalties };
-  }, [filteredServices]);
+    // Cálculo de Rastreadores Disponíveis
+    let myTrackers = trackers;
+    const isAdmin = currentUser.role === UserRole.MASTER || currentUser.role === UserRole.ADMIN;
+    
+    if (!isAdmin) {
+        myTrackers = trackers.filter(t => t.technicianId === currentUser.id);
+    } else if (viewingTechnicianId) {
+        myTrackers = trackers.filter(t => t.technicianId === viewingTechnicianId);
+    }
+
+    const availableTrackers = myTrackers.filter(t => t.status === TrackerStatus.DISPONIVEL).length;
+
+    return { total, realized, cancelled, revenue: grossRevenue - techPenalties, availableTrackers };
+  }, [filteredServices, trackers, currentUser, viewingTechnicianId]);
 
   const COLORS = {
     [Company.AIROTRACKER]: '#FF5F15',
@@ -139,9 +153,10 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-8">
         <StatCard title="Total de Serviços" value={stats.total} icon={Truck} color="bg-indigo-600" />
         <StatCard title="Realizados" value={stats.realized} icon={CheckCircle2} color="bg-emerald-500" />
+        <StatCard title="Rastreadores Disponíveis" value={stats.availableTrackers} icon={Radio} color="bg-[#0A192F]" />
         <StatCard title="Cancelados" value={stats.cancelled} icon={XCircle} color="bg-rose-500" />
         <StatCard title="Faturamento Líquido" value={stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} prefix="R$ " icon={DollarSign} color="bg-[#00AEEF]" />
       </div>

@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Service, User, ServiceType, Company, ServiceStatus, CancelledBy, UserRole, Reimbursement, ReimbursementType, ReimbursementStatus } from '../types';
+import { Service, User, ServiceType, Company, ServiceStatus, CancelledBy, UserRole, Reimbursement, ReimbursementType, ReimbursementStatus, Tracker, TrackerStatus } from '../types';
 
 // =========================================================================
 // CONFIGURAÇÃO DO BANCO DE DADOS
@@ -33,7 +33,8 @@ export const mapServiceFromDB = (s: any): Service => ({
   technicianId: s.technician_id,
   technicianName: s.technician_name,
   cancellationReason: s.cancellation_reason,
-  cancelledBy: s.cancelled_by as CancelledBy
+  cancelledBy: s.cancelled_by as CancelledBy,
+  imei: s.imei // Mapeando IMEI
 });
 
 export const mapServiceToDB = (s: Partial<Service>) => ({
@@ -50,7 +51,8 @@ export const mapServiceToDB = (s: Partial<Service>) => ({
   technician_id: s.technicianId,
   technician_name: s.technicianName,
   cancellation_reason: s.cancellationReason,
-  cancelled_by: s.cancelledBy
+  cancelled_by: s.cancelledBy,
+  imei: s.imei // Salvando IMEI
 });
 
 export const mapUserFromDB = (u: any): User => ({
@@ -95,4 +97,26 @@ export const mapReimbursementToDB = (r: Partial<Reimbursement>) => ({
   status: r.status,
   technician_id: r.technicianId,
   technician_name: r.technicianName
+});
+
+export const mapTrackerFromDB = (t: any): Tracker => ({
+  id: t.id,
+  date: t.date,
+  model: t.model,
+  imei: t.imei,
+  status: t.status as TrackerStatus,
+  technicianId: t.technician_id,
+  technicianName: t.technician_name,
+  installationDate: t.installation_date
+});
+
+export const mapTrackerToDB = (t: Partial<Tracker>) => ({
+  id: t.id,
+  date: t.date,
+  model: t.model,
+  imei: t.imei,
+  status: t.status,
+  technician_id: t.technicianId,
+  technician_name: t.technicianName,
+  installation_date: t.installationDate
 });

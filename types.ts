@@ -46,6 +46,12 @@ export enum ReimbursementStatus {
   PAGO = 'PAGO'
 }
 
+export enum TrackerStatus {
+  DISPONIVEL = 'DISPONÍVEL',
+  INSTALADO = 'INSTALADO',
+  DEFEITO = 'DEFEITO'
+}
+
 export interface User {
   id: string;
   name: string;
@@ -71,6 +77,7 @@ export interface Service {
   technicianName: string;
   cancellationReason?: string;
   cancelledBy?: CancelledBy;
+  imei?: string; // Novo campo para vincular equipamento
 }
 
 export interface Reimbursement {
@@ -83,4 +90,15 @@ export interface Reimbursement {
   status: ReimbursementStatus;
   technicianId: string;
   technicianName: string;
+}
+
+export interface Tracker {
+  id: string;
+  date: string; // Data de entrada no estoque
+  model: string;
+  imei: string;
+  status: TrackerStatus;
+  technicianId: string; // Quem está com o equipamento
+  technicianName: string;
+  installationDate?: string; // Data em que foi instalado
 }
