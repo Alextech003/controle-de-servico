@@ -171,15 +171,56 @@ const App: React.FC = () => {
 
     } catch (error: any) {
       console.error("Erro ao salvar serviço:", error);
-      alert(`Erro ao salvar no banco de dados: ${error.message || error.details || 'Erro desconhecido'}`);
-      // Reverter estado local em caso de erro (opcional, mas recomendado)
+      
+      const msg = error.message || '';
+      
+      // TRATAMENTO ESPECÍFICO PARA FALTA DA COLUNA IMEI
+      if (msg.includes("Could not find the 'imei' column") || msg.includes("imei")) {
+         alert("ATENÇÃO: O banco de dados precisa ser atualizado!\n\nA coluna 'imei' não existe na tabela 'services'.\n\nPor favor, execute este comando no SQL Editor do Supabase:\n\nALTER TABLE public.services ADD COLUMN IF NOT EXISTS imei text;");
+      } else {
+         alert(`Erro ao salvar no banco de dados: ${msg}`);
+      }
+      
+      // Reverter estado local em caso de erro
       fetchAllData();
     }
   };
 
   const handleDeleteService = async (id: string) => {
+    // 1. Identificar o serviço a ser excluído para verificar se tem IMEI vinculado
+    const serviceToDelete = services.find(s => String(s.id) === String(id));
+    
+    // 2. Atualização Otimista da Lista de Serviços
     const previousServices = [...services];
     setServices(prev => prev.filter(s => String(s.id) !== String(id)));
+
+    // 3. Lógica de Reversão de Estoque (Se tinha IMEI, volta para DISPONIVEL)
+    if (serviceToDelete && serviceToDelete.imei) {
+        const tracker = trackers.find(t => t.imei === serviceToDelete.imei);
+        
+        if (tracker) {
+            // Cria o objeto atualizado
+            const updatedTracker: Tracker = {
+                ...tracker,
+                status: TrackerStatus.DISPONIVEL,
+                installationDate: undefined // Remove a data de instalação
+            };
+
+            // Atualiza visualmente na hora
+            setTrackers(prev => prev.map(t => t.id === tracker.id ? updatedTracker : t));
+
+            // Atualiza no Banco (se não for demo)
+            if (!isDemoMode) {
+                supabase.from('trackers')
+                    .update(mapTrackerToDB(updatedTracker))
+                    .eq('id', tracker.id)
+                    .then(({ error }) => {
+                        if (error) console.error("Erro ao liberar rastreador:", error);
+                        else console.log(`Rastreador ${tracker.imei} liberado com sucesso.`);
+                    });
+            }
+        }
+    }
 
     if (isDemoMode) return;
 
@@ -188,7 +229,8 @@ const App: React.FC = () => {
       if (error) throw error;
     } catch (error: any) {
       alert(`Erro ao excluir no servidor: ${error.message}`);
-      setServices(previousServices);
+      setServices(previousServices); // Reverte a exclusão visual se der erro
+      fetchAllData(); // Recarrega tudo para garantir consistência
     }
   };
 

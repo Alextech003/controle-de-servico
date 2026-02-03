@@ -76,16 +76,34 @@ const Trackers: React.FC<TrackersProps> = ({
     );
   }, [trackers, viewingTechId, isManager, currentUser.id, searchTerm, activeCompanyFilter]);
 
-  // Agrupamento por Data de Entrada (Visual "embolado" resolvido)
+  // Agrupamento por Data de Entrada e Ordenação por Empresa
   const groupedTrackers = useMemo(() => {
     const groups: Record<string, Tracker[]> = {};
+    
+    // 1. Agrupar por data
     filteredTrackers.forEach(t => {
         if (!groups[t.date]) {
             groups[t.date] = [];
         }
         groups[t.date].push(t);
     });
-    // Retorna ordenado (mais recente primeiro)
+
+    // 2. Ordenar dentro de cada data: Empresa (A-Z) -> Modelo -> IMEI
+    Object.keys(groups).forEach(date => {
+        groups[date].sort((a, b) => {
+            // Critério Principal: Empresa
+            const companyCompare = a.company.localeCompare(b.company);
+            if (companyCompare !== 0) return companyCompare;
+            
+            // Critério Secundário: Modelo
+            const modelCompare = a.model.localeCompare(b.model);
+            if (modelCompare !== 0) return modelCompare;
+
+            // Critério Terciário: IMEI
+            return a.imei.localeCompare(b.imei);
+        });
+    });
+
     return groups;
   }, [filteredTrackers]);
 
