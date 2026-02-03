@@ -104,6 +104,7 @@ export const mapTrackerFromDB = (t: any): Tracker => ({
   date: t.date,
   model: t.model,
   imei: t.imei,
+  company: t.company as Company, // Adicionado mapeamento de empresa
   status: t.status as TrackerStatus,
   technicianId: t.technician_id,
   technicianName: t.technician_name,
@@ -115,6 +116,7 @@ export const mapTrackerToDB = (t: Partial<Tracker>) => ({
   date: t.date,
   model: t.model,
   imei: t.imei,
+  company: t.company, // Adicionado mapeamento de empresa
   status: t.status,
   technician_id: t.technicianId,
   technician_name: t.technicianName,

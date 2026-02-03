@@ -6,7 +6,7 @@ import {
   Loader2, ArrowRight
 } from 'lucide-react';
 import { 
-  Tracker, TrackerStatus, User, UserRole 
+  Tracker, TrackerStatus, User, UserRole, Company 
 } from '../types';
 
 interface TrackersProps {
@@ -24,6 +24,7 @@ const Trackers: React.FC<TrackersProps> = ({
   const [editingTracker, setEditingTracker] = useState<Tracker | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [activeCompanyFilter, setActiveCompanyFilter] = useState<Company | 'ALL'>('ALL');
   
   // Estado para Admin/Master controlar qual técnico está vendo
   const [viewingTechId, setViewingTechId] = useState<string | null>(null);
@@ -32,6 +33,7 @@ const Trackers: React.FC<TrackersProps> = ({
     date: new Date().toISOString().split('T')[0],
     model: '',
     imei: '',
+    company: Company.AIROCLUBE,
     status: TrackerStatus.DISPONIVEL,
   };
 
@@ -52,11 +54,16 @@ const Trackers: React.FC<TrackersProps> = ({
        list = list.filter(t => t.technicianId === currentUser.id);
     }
 
+    // Filtro por Empresa (Tabs)
+    if (activeCompanyFilter !== 'ALL') {
+        list = list.filter(t => t.company === activeCompanyFilter);
+    }
+
     return list.filter(t => 
       t.imei.toLowerCase().includes(searchTerm.toLowerCase()) || 
       t.model.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [trackers, viewingTechId, isManager, currentUser.id, searchTerm]);
+  }, [trackers, viewingTechId, isManager, currentUser.id, searchTerm, activeCompanyFilter]);
 
   // Agrupamento por Data de Entrada (Visual "embolado" resolvido)
   const groupedTrackers = useMemo(() => {
@@ -113,6 +120,15 @@ const Trackers: React.FC<TrackersProps> = ({
     }
   };
 
+  const getCompanyColor = (company: Company) => {
+      switch (company) {
+          case Company.AIROCLUBE: return 'text-purple-600 bg-purple-50 border-purple-200';
+          case Company.AIROTRACKER: return 'text-orange-600 bg-orange-50 border-orange-200';
+          case Company.CARTRAC: return 'text-cyan-600 bg-cyan-50 border-cyan-200';
+          default: return 'text-slate-600 bg-slate-50 border-slate-200';
+      }
+  };
+
   return (
     <div className="flex h-full animate-in fade-in duration-500 overflow-hidden">
       
@@ -153,9 +169,18 @@ const Trackers: React.FC<TrackersProps> = ({
             </button>
         </div>
 
-        <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-            <input type="text" placeholder="Buscar por IMEI ou Modelo..." className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        {/* Filtros e Busca */}
+        <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <input type="text" placeholder="Buscar por IMEI ou Modelo..." className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
+            <div className="flex bg-white border border-slate-200 rounded-2xl p-1 overflow-x-auto">
+                <button onClick={() => setActiveCompanyFilter('ALL')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${activeCompanyFilter === 'ALL' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Todas</button>
+                {Object.values(Company).map(comp => (
+                    <button key={comp} onClick={() => setActiveCompanyFilter(comp)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${activeCompanyFilter === comp ? 'bg-[#00AEEF] text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>{comp}</button>
+                ))}
+            </div>
         </div>
 
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -164,6 +189,7 @@ const Trackers: React.FC<TrackersProps> = ({
                     <thead className="bg-slate-50/80 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100">
                         <tr>
                             <th className="px-6 py-5 whitespace-nowrap">Data Entrada</th>
+                            <th className="px-6 py-5 whitespace-nowrap">Empresa</th>
                             <th className="px-6 py-5 whitespace-nowrap">Modelo</th>
                             <th className="px-6 py-5 whitespace-nowrap">IMEI</th>
                             {isManager && <th className="px-6 py-5 whitespace-nowrap">Técnico Responsável</th>}
@@ -173,13 +199,13 @@ const Trackers: React.FC<TrackersProps> = ({
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {Object.keys(groupedTrackers).length === 0 ? (
-                            <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Nenhum equipamento encontrado</td></tr>
+                            <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Nenhum equipamento encontrado</td></tr>
                         ) : (
                             Object.keys(groupedTrackers).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()).map(date => (
                                 <React.Fragment key={date}>
-                                    {/* Linha de Separação por Data (Para não ficar embolado) */}
+                                    {/* Linha de Separação por Data */}
                                     <tr className="bg-slate-50/50">
-                                        <td colSpan={6} className="px-6 py-3">
+                                        <td colSpan={7} className="px-6 py-3">
                                             <div className="flex items-center w-full">
                                                 <div className="h-px bg-blue-200 flex-1"></div>
                                                 <div className="px-4 py-1.5 bg-white border border-blue-100 rounded-full flex items-center space-x-2 shadow-sm mx-4">
@@ -200,6 +226,11 @@ const Trackers: React.FC<TrackersProps> = ({
                                                     <CalendarDays size={14} />
                                                     <span>{new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
                                                 </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase border ${getCompanyColor(t.company)}`}>
+                                                    {t.company}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-4 font-black text-slate-800 uppercase whitespace-nowrap">{t.model}</td>
                                             <td className="px-6 py-4 whitespace-nowrap">
@@ -255,19 +286,29 @@ const Trackers: React.FC<TrackersProps> = ({
             </div>
             
             <div className="p-8 space-y-6">
-                <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Data de Entrada</label>
-                    <input type="date" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} />
-                </div>
-                <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Modelo</label>
-                    <input type="text" placeholder="Ex: FMB920" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900 uppercase" value={formData.model} onChange={(e) => setFormData({...formData, model: e.target.value})} />
-                </div>
-                <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">IMEI</label>
-                    <div className="relative">
-                        <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="text" placeholder="Apenas números" className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900" value={formData.imei} onChange={(e) => setFormData({...formData, imei: e.target.value.replace(/\D/g, '')})} />
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Data de Entrada</label>
+                        <input type="date" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} />
+                    </div>
+                    <div className="col-span-2">
+                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Empresa do Equipamento</label>
+                        <select className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900" value={formData.company} onChange={(e) => setFormData({...formData, company: e.target.value as Company})}>
+                            {Object.values(Company).map(comp => (
+                                <option key={comp} value={comp}>{comp}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="col-span-2">
+                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">Modelo</label>
+                        <input type="text" placeholder="Ex: FMB920" className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900 uppercase" value={formData.model} onChange={(e) => setFormData({...formData, model: e.target.value})} />
+                    </div>
+                    <div className="col-span-2">
+                        <label className="block text-xs font-black text-slate-500 uppercase mb-2 ml-1">IMEI</label>
+                        <div className="relative">
+                            <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input type="text" placeholder="Apenas números" className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-slate-900" value={formData.imei} onChange={(e) => setFormData({...formData, imei: e.target.value.replace(/\D/g, '')})} />
+                        </div>
                     </div>
                 </div>
 

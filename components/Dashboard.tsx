@@ -80,8 +80,15 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
     }
 
     const availableTrackers = myTrackers.filter(t => t.status === TrackerStatus.DISPONIVEL).length;
+    
+    // Breakdown por Empresa
+    const byCompany = {
+        [Company.AIROCLUBE]: myTrackers.filter(t => t.status === TrackerStatus.DISPONIVEL && t.company === Company.AIROCLUBE).length,
+        [Company.AIROTRACKER]: myTrackers.filter(t => t.status === TrackerStatus.DISPONIVEL && t.company === Company.AIROTRACKER).length,
+        [Company.CARTRAC]: myTrackers.filter(t => t.status === TrackerStatus.DISPONIVEL && t.company === Company.CARTRAC).length,
+    };
 
-    return { total, realized, cancelled, revenue: grossRevenue - techPenalties, availableTrackers };
+    return { total, realized, cancelled, revenue: grossRevenue - techPenalties, availableTrackers, byCompany };
   }, [filteredServices, trackers, currentUser, viewingTechnicianId]);
 
   const COLORS = {
@@ -98,7 +105,7 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
   };
 
   const StatCard = ({ title, value, icon: Icon, color, prefix = "" }: any) => (
-    <div className="bg-white p-6 md:p-7 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between group hover:shadow-xl transition-all duration-500 print:shadow-none print:border-slate-300">
+    <div className="bg-white p-6 md:p-7 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between group hover:shadow-xl transition-all duration-500 print:shadow-none print:border-slate-300 h-full">
       <div>
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{title}</p>
         <h3 className="text-2xl md:text-3xl font-black text-slate-900">{prefix}{value}</h3>
@@ -106,6 +113,34 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
       <div className={`p-4 md:p-5 rounded-2xl ${color} text-white`}>
         <Icon size={24} className="md:w-7 md:h-7" />
       </div>
+    </div>
+  );
+
+  const StockCard = ({ title, total, byCompany, icon: Icon, color }: any) => (
+    <div className="bg-white p-6 md:p-7 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col justify-between group hover:shadow-xl transition-all duration-500 print:shadow-none print:border-slate-300 h-full">
+        <div className="flex items-center justify-between mb-4">
+            <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</p>
+                <h3 className="text-2xl md:text-3xl font-black text-slate-900">{total}</h3>
+            </div>
+            <div className={`p-4 md:p-5 rounded-2xl ${color} text-white`}>
+                <Icon size={24} className="md:w-7 md:h-7" />
+            </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
+             <div className="text-center">
+                 <p className="text-[9px] font-black text-purple-500 uppercase">Clube</p>
+                 <p className="text-lg font-black text-slate-800">{byCompany[Company.AIROCLUBE]}</p>
+             </div>
+             <div className="text-center border-l border-r border-slate-100">
+                 <p className="text-[9px] font-black text-orange-500 uppercase">Tracker</p>
+                 <p className="text-lg font-black text-slate-800">{byCompany[Company.AIROTRACKER]}</p>
+             </div>
+             <div className="text-center">
+                 <p className="text-[9px] font-black text-cyan-500 uppercase">Cartrac</p>
+                 <p className="text-lg font-black text-slate-800">{byCompany[Company.CARTRAC]}</p>
+             </div>
+        </div>
     </div>
   );
 
@@ -156,7 +191,16 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-8">
         <StatCard title="Total de Serviços" value={stats.total} icon={Truck} color="bg-indigo-600" />
         <StatCard title="Realizados" value={stats.realized} icon={CheckCircle2} color="bg-emerald-500" />
-        <StatCard title="Rastreadores Disponíveis" value={stats.availableTrackers} icon={Radio} color="bg-[#0A192F]" />
+        
+        {/* Card Especial de Estoque */}
+        <StockCard 
+            title="Estoque Disponível" 
+            total={stats.availableTrackers} 
+            byCompany={stats.byCompany} 
+            icon={Radio} 
+            color="bg-[#0A192F]" 
+        />
+        
         <StatCard title="Cancelados" value={stats.cancelled} icon={XCircle} color="bg-rose-500" />
         <StatCard title="Faturamento Líquido" value={stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} prefix="R$ " icon={DollarSign} color="bg-[#00AEEF]" />
       </div>

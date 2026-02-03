@@ -97,6 +97,7 @@ export interface Tracker {
   date: string; // Data de entrada no estoque
   model: string;
   imei: string;
+  company: Company; // Empresa do equipamento
   status: TrackerStatus;
   technicianId: string; // Quem está com o equipamento
   technicianName: string;

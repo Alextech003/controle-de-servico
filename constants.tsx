@@ -116,6 +116,7 @@ export const MOCK_TRACKERS: Tracker[] = [
     date: '2024-01-20',
     model: 'FMB920',
     imei: '865432050000001',
+    company: Company.AIROCLUBE,
     status: TrackerStatus.DISPONIVEL,
     technicianId: '3',
     technicianName: 'José Técnico'
@@ -125,6 +126,7 @@ export const MOCK_TRACKERS: Tracker[] = [
     date: '2024-01-22',
     model: 'GV50',
     imei: '865432050000002',
+    company: Company.AIROTRACKER,
     status: TrackerStatus.DISPONIVEL,
     technicianId: '3',
     technicianName: 'José Técnico'
@@ -134,8 +136,10 @@ export const MOCK_TRACKERS: Tracker[] = [
     date: '2024-01-25',
     model: 'FMB920',
     imei: '865432050000003',
+    company: Company.CARTRAC,
     status: TrackerStatus.INSTALADO,
     technicianId: '4',
-    technicianName: 'Lucas Silva'
+    technicianName: 'Lucas Silva',
+    installationDate: '2024-02-01'
   }
 ];
