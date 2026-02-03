@@ -87,7 +87,10 @@ const App: React.FC = () => {
           } else {
              // Caso a tabela ainda não exista no Supabase ou erro de fetch
              console.log('Tabela trackers vazia ou inexistente:', trackersError);
-             setTrackers([]);
+             // Não sobrescreve com vazio se der erro de conexão, mantém o que tem ou vazio
+             if (trackersError?.code !== 'PGRST301') {
+                setTrackers([]);
+             }
           }
       } 
       
@@ -254,12 +257,21 @@ const App: React.FC = () => {
         }
      } catch (error: any) { 
          console.error("Erro ao salvar rastreador:", error);
-         // Alerta amigável para erro de coluna inexistente
-         if (error.message?.includes('column') && error.message?.includes('does not exist')) {
-            alert(`ERRO DE BANCO DE DADOS: A tabela 'trackers' não possui as colunas novas (company, installation_date). É necessário atualizar o banco de dados.`);
+         
+         const msg = error.message || '';
+         const code = error.code || '';
+
+         // Alerta amigável para erro de tabela inexistente
+         if (msg.includes('Could not find the table') || msg.includes('relation "public.trackers" does not exist') || code === '42P01') {
+            alert(`ERRO CRÍTICO: A tabela 'trackers' não existe no seu banco de dados Supabase.\n\nPor favor, execute o comando SQL fornecido no chat para criar a tabela.`);
+         } 
+         // Alerta para coluna inexistente
+         else if (msg.includes('column') && msg.includes('does not exist')) {
+            alert(`ERRO DE ESTRUTURA: A tabela 'trackers' existe mas faltam colunas novas (company, installation_date).\n\nAtualize o banco de dados.`);
          } else {
-            alert(`Erro ao salvar rastreador: ${error.message || JSON.stringify(error)}`);
+            alert(`Erro ao salvar rastreador: ${msg}`);
          }
+         
          setTrackers(previousTrackers); // Reverte a alteração visual
      }
   };
