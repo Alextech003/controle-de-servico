@@ -391,8 +391,8 @@ const Services: React.FC<ServicesProps> = ({
                                         {s.company.substring(0, 10)}
                                     </span>
                                 </td>
-                                <td className="px-3 py-2 text-center whitespace-nowrap max-w-[90px] truncate">
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                <td className="px-3 py-2 text-center whitespace-nowrap max-w-[250px] truncate" title={s.vehicle}>
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded max-w-full truncate">
                                         {s.vehicle || '-'}
                                     </span>
                                 </td>
