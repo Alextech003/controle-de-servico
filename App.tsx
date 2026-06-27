@@ -459,7 +459,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard services={dashboardServices} currentUser={currentUser} users={users} viewingTechnicianId={viewingTechnicianId} onViewTechnician={(id) => { setViewingTechnicianId(id); setActiveTab('services'); }} trackers={trackers} />;
+        return <Dashboard services={dashboardServices} reimbursements={visibleReimbursements} currentUser={currentUser} users={users} viewingTechnicianId={viewingTechnicianId} onViewTechnician={(id) => { setViewingTechnicianId(id); setActiveTab('services'); }} trackers={trackers} />;
       case 'services':
         return <Services services={visibleServices} currentUser={currentUser} users={users} onSaveService={handleSaveService} onDeleteService={handleDeleteService} viewingTechnicianId={viewingTechnicianId} onClearFilter={() => setViewingTechnicianId(null)} onFilterByTech={(id) => setViewingTechnicianId(id)} trackers={trackers} />;
       case 'trackers':

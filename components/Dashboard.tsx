@@ -2,13 +2,13 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Truck, CheckCircle2, DollarSign, XCircle, 
-  ChevronLeft, ChevronRight, TrendingUp, FileText, PieChart, BarChart3, Radio
+  ChevronLeft, ChevronRight, TrendingUp, FileText, PieChart, BarChart3, Radio, Wallet
 } from 'lucide-react';
 import { 
   ResponsiveContainer, PieChart as RePieChart, Pie, Cell, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip
 } from 'recharts';
-import { Service, ServiceStatus, User, UserRole, Company, ServiceType, CancelledBy, Tracker, TrackerStatus } from '../types';
+import { Service, ServiceStatus, User, UserRole, Company, ServiceType, CancelledBy, Tracker, TrackerStatus, Reimbursement, ReimbursementStatus, ReimbursementType } from '../types';
 
 interface DashboardProps {
   services: Service[];
@@ -17,9 +17,10 @@ interface DashboardProps {
   viewingTechnicianId: string | null;
   onViewTechnician: (id: string) => void;
   trackers?: Tracker[];
+  reimbursements?: Reimbursement[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, viewingTechnicianId, trackers = [] }) => {
+const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, viewingTechnicianId, trackers = [], reimbursements = [] }) => {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -88,8 +89,28 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
         [Company.CARTRAC]: myTrackers.filter(t => t.status === TrackerStatus.DISPONIVEL && t.company === Company.CARTRAC).length,
     };
 
-    return { total, realized, cancelled, revenue: grossRevenue - techPenalties, availableTrackers, byCompany };
-  }, [filteredServices, trackers, currentUser, viewingTechnicianId]);
+    // Reembolso a receber (pendente/aprovado/aguardando)
+    let myReimbursements = reimbursements;
+    if (!isAdmin) {
+      myReimbursements = reimbursements.filter(r => r.technicianId === currentUser.id);
+    } else if (viewingTechnicianId) {
+      myReimbursements = reimbursements.filter(r => r.technicianId === viewingTechnicianId);
+    }
+
+    const pendingReimbursementValue = myReimbursements
+      .filter(r => {
+        const rDate = new Date(r.date + 'T12:00:00');
+        const isCurrentMonth = rDate.getMonth() === selectedMonth && rDate.getFullYear() === selectedYear;
+        const isPending = r.status === ReimbursementStatus.PENDENTE || r.status === ReimbursementStatus.AGUARDANDO_CONFIRMACAO || r.status === ReimbursementStatus.APROVADO;
+        return isCurrentMonth && isPending;
+      })
+      .reduce((acc, r) => {
+        const val = r.type === ReimbursementType.MANUTENCAO_VEICULO ? r.value / 2 : r.value;
+        return acc + val;
+      }, 0);
+
+    return { total, realized, cancelled, revenue: grossRevenue - techPenalties, availableTrackers, byCompany, pendingReimbursementValue };
+  }, [filteredServices, trackers, currentUser, viewingTechnicianId, reimbursements, selectedMonth, selectedYear]);
 
   const COLORS = {
     [Company.AIROTRACKER]: '#FF5F15',
@@ -104,8 +125,8 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
     window.print();
   };
 
-  const StatCard = ({ title, value, icon: Icon, color, prefix = "" }: any) => (
-    <div className="bg-white p-6 md:p-7 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between group hover:shadow-xl transition-all duration-500 print:shadow-none print:border-slate-300 h-full">
+  const StatCard = ({ title, value, icon: Icon, color, prefix = "", className = "" }: any) => (
+    <div className={`bg-white p-6 md:p-7 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between group hover:shadow-xl transition-all duration-500 print:shadow-none print:border-slate-300 h-full ${className}`}>
       <div>
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{title}</p>
         <h3 className="text-2xl md:text-3xl font-black text-slate-900">{prefix}{value}</h3>
@@ -116,8 +137,8 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
     </div>
   );
 
-  const StockCard = ({ title, total, byCompany, icon: Icon, color }: any) => (
-    <div className="bg-white p-6 md:p-7 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col justify-between group hover:shadow-xl transition-all duration-500 print:shadow-none print:border-slate-300 h-full">
+  const StockCard = ({ title, total, byCompany, icon: Icon, color, className = "" }: any) => (
+    <div className={`bg-white p-6 md:p-7 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col justify-between group hover:shadow-xl transition-all duration-500 print:shadow-none print:border-slate-300 h-full ${className}`}>
         <div className="flex items-center justify-between mb-4">
             <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</p>
@@ -192,13 +213,13 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
         <StatCard title="Total de Serviços" value={stats.total} icon={Truck} color="bg-indigo-600" />
         <StatCard title="Realizados" value={stats.realized} icon={CheckCircle2} color="bg-emerald-500" />
         
-        {/* Card Especial de Estoque */}
-        <StockCard 
-            title="Estoque Disponível" 
-            total={stats.availableTrackers} 
-            byCompany={stats.byCompany} 
-            icon={Radio} 
-            color="bg-[#0A192F]" 
+        {/* Card de Reembolso */}
+        <StatCard 
+            title="Reembolso a Receber" 
+            value={stats.pendingReimbursementValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+            prefix="R$ " 
+            icon={Wallet} 
+            color="bg-amber-500" 
         />
         
         <StatCard title="Cancelados" value={stats.cancelled} icon={XCircle} color="bg-rose-500" />

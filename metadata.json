@@ -1,5 +1,6 @@
 {
   "name": "AIROTRACKER + Técnicos",
   "description": "Sistema completo para controle de serviços de técnicos em empresas de rastreamento, com dashboard financeiro, gestão de usuários e níveis de acesso diferenciados.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }
