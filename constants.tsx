@@ -15,10 +15,13 @@ export const MOCK_USERS: User[] = [
   { id: '7', name: 'Técnico 3', phone: 'tecnico3', role: UserRole.TECHNICIAN, isActive: true, password: '123' },
 ];
 
+const currentDate = new Date();
+const currentMonthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+
 export const MOCK_SERVICES: Service[] = [
   {
     id: 's1',
-    date: '2024-01-08',
+    date: `${currentMonthStr}-08`,
     customerName: 'ALBERTO MAIA ALVES',
     neighborhood: 'ITAGUAÍ',
     type: ServiceType.INSTALACAO,
@@ -33,7 +36,7 @@ export const MOCK_SERVICES: Service[] = [
   },
   {
     id: 's2',
-    date: '2024-01-08',
+    date: `${currentMonthStr}-08`,
     customerName: 'ANNA CLARA ELEUTERIO MESQUITA',
     neighborhood: 'CAMPO GRANDE',
     type: ServiceType.MANUTENCAO,
@@ -47,7 +50,7 @@ export const MOCK_SERVICES: Service[] = [
   },
   {
     id: 's3',
-    date: '2024-01-07',
+    date: `${currentMonthStr}-07`,
     customerName: 'LUCAS DE ARAUJO FERNANDES',
     neighborhood: 'CAMPO GRANDE',
     type: ServiceType.INSTALACAO,
@@ -61,7 +64,7 @@ export const MOCK_SERVICES: Service[] = [
   },
   {
     id: 's4',
-    date: '2024-01-07',
+    date: `${currentMonthStr}-07`,
     customerName: 'MARIA DA PENHA',
     neighborhood: 'GUARATIBA',
     type: ServiceType.RETIRADA,
@@ -80,7 +83,7 @@ export const MOCK_SERVICES: Service[] = [
 export const MOCK_REIMBURSEMENTS: Reimbursement[] = [
   {
     id: 'r1',
-    date: '2024-02-01',
+    date: `${currentMonthStr}-01`,
     type: ReimbursementType.COMBUSTIVEL,
     description: 'Abastecimento para rota Zona Sul',
     value: 150.00,
@@ -90,7 +93,7 @@ export const MOCK_REIMBURSEMENTS: Reimbursement[] = [
   },
   {
     id: 'r2',
-    date: '2024-02-02',
+    date: `${currentMonthStr}-02`,
     type: ReimbursementType.PEDAGIO,
     description: 'Pedágio Linha Amarela',
     value: 18.60,
@@ -100,7 +103,7 @@ export const MOCK_REIMBURSEMENTS: Reimbursement[] = [
   },
   {
     id: 'r3',
-    date: '2024-02-01',
+    date: `${currentMonthStr}-01`,
     type: ReimbursementType.MATERIAL,
     description: 'Fita isolante e conectores',
     value: 45.00,
@@ -113,7 +116,7 @@ export const MOCK_REIMBURSEMENTS: Reimbursement[] = [
 export const MOCK_TRACKERS: Tracker[] = [
   {
     id: 't1',
-    date: '2024-01-20',
+    date: `${currentMonthStr}-20`,
     model: 'FMB920',
     imei: '865432050000001',
     company: Company.AIROCLUBE,
@@ -123,7 +126,7 @@ export const MOCK_TRACKERS: Tracker[] = [
   },
   {
     id: 't2',
-    date: '2024-01-22',
+    date: `${currentMonthStr}-22`,
     model: 'GV50',
     imei: '865432050000002',
     company: Company.AIROTRACKER,
@@ -133,13 +136,13 @@ export const MOCK_TRACKERS: Tracker[] = [
   },
   {
     id: 't3',
-    date: '2024-01-25',
+    date: `${currentMonthStr}-25`,
     model: 'FMB920',
     imei: '865432050000003',
     company: Company.CARTRAC,
     status: TrackerStatus.INSTALADO,
     technicianId: '4',
     technicianName: 'Lucas Silva',
-    installationDate: '2024-02-01'
+    installationDate: `${currentMonthStr}-01`
   }
 ];

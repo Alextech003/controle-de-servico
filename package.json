@@ -1,7 +1,7 @@
 {
   "name": "airo-tech-system",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,7 @@
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.18",
     "postcss": "^8.4.35",
+    "sharp": "^0.35.4",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.0",
     "vite": "^5.1.0"

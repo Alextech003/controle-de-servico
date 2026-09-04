@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Gradiente de Fundo Premium -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#0F213E" />
+      <stop offset="50%" stopColor="#0A192F" />
+      <stop offset="100%" stopColor="#040914" />
+    </linearGradient>
+
+    <!-- Gradiente Metálico Escuro para o corpo do A -->
+    <linearGradient id="metallicBody" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stopColor="#4A5568" />
+      <stop offset="30%" stopColor="#2D3748" />
+      <stop offset="70%" stopColor="#1A202C" />
+      <stop offset="100%" stopColor="#111827" />
+    </linearGradient>
+
+    <!-- Gradiente Vermelho Vivo AIROTRACKER -->
+    <linearGradient id="redAccent" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#FF4D4D" />
+      <stop offset="60%" stopColor="#E52E2E" />
+      <stop offset="100%" stopColor="#B91C1C" />
+    </linearGradient>
+
+    <!-- Gradiente Ciano Neon para tecnologia/GPS -->
+    <linearGradient id="cyanGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#38BDF8" />
+      <stop offset="100%" stopColor="#0284C7" />
+    </linearGradient>
+
+    <!-- Filtro de Sombra 3D -->
+    <filter id="shadow3D" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#000000" flood-opacity="0.6" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#00AEEF" flood-opacity="0.2" />
+    </filter>
+
+    <!-- Brilho do Radar -->
+    <filter id="neonBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Fundo com cantos arredondados padrão App Store / PWA -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Borda Sutil com Iluminação Superior -->
+  <rect width="508" height="508" x="2" y="2" rx="110" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="3" />
+
+  <!-- Luz radial no topo -->
+  <circle cx="256" cy="180" r="160" fill="#00AEEF" opacity="0.12" filter="url(#neonBlur)" />
+
+  <!-- Ondas de Sinal GPS / Rastreamento no topo (Transparência sutil) -->
+  <path d="M196 150 C214 132, 298 132, 316 150" fill="none" stroke="url(#cyanGlow)" stroke-width="6" stroke-linecap="round" opacity="0.75" />
+  <path d="M216 175 C228 162, 284 162, 296 175" fill="none" stroke="url(#cyanGlow)" stroke-width="5" stroke-linecap="round" opacity="0.9" />
+  
+  <!-- Ponto GPS / Pulso Central -->
+  <circle cx="256" cy="192" r="5" fill="#38BDF8" />
+
+  <!-- Ícone Principal 'A' AIROTRACKER em 3D -->
+  <g filter="url(#shadow3D)">
+    <!-- Corpo Exterior do 'A' (Preto Metálico Tridimensional) -->
+    <path 
+      d="M256 195 L145 375 H202 L234 322 L256 286 L278 322 L310 375 H367 L256 195 Z" 
+      fill="url(#metallicBody)" 
+      stroke="#4A5568"
+      stroke-width="1.5"
+    />
+
+    <!-- Bisel de iluminação na aresta esquerda -->
+    <path 
+      d="M256 195 L145 375 H162 L256 215 Z" 
+      fill="rgba(255, 255, 255, 0.15)" 
+    />
+
+    <!-- Triângulo Interno Superior (Vazado com brilho vermelho) -->
+    <path 
+      d="M236 308 H276 L256 270 Z" 
+      fill="url(#redAccent)" 
+    />
+
+    <!-- Barra Horizontal Tridimensional da Marca (Vermelho Vivo) -->
+    <rect 
+      x="216" 
+      y="320" 
+      width="80" 
+      height="22" 
+      rx="4" 
+      fill="url(#redAccent)" 
+      stroke="#FF6B6B"
+      stroke-width="1"
+    />
+
+    <!-- Brilho no topo da barra vermelha -->
+    <line 
+      x1="218" 
+      y1="322" 
+      x2="294" 
+      y2="322" 
+      stroke="rgba(255, 255, 255, 0.4)" 
+      stroke-width="2" 
+      stroke-linecap="round" 
+    />
+  </g>
+
+  <!-- Tag inferior sutil "AIROTRACKER" -->
+  <text 
+    x="256" 
+    y="435" 
+    text-anchor="middle" 
+    font-family="system-ui, -apple-system, sans-serif" 
+    font-size="28" 
+    font-weight="900" 
+    letter-spacing="5" 
+    fill="#F8FAFC"
+  >
+    AIRO<tspan fill="#FF4D4D">TRACKER</tspan>
+  </text>
+  
+  <text 
+    x="256" 
+    y="458" 
+    text-anchor="middle" 
+    font-family="system-ui, -apple-system, sans-serif" 
+    font-size="13" 
+    font-weight="800" 
+    letter-spacing="4" 
+    fill="#94A3B8"
+  >
+    MONITORAMENTO 24H
+  </text>
+</svg>
