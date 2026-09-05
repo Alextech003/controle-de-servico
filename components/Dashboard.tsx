@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Truck, CheckCircle2, DollarSign, XCircle, 
-  ChevronLeft, ChevronRight, TrendingUp, FileText, PieChart, BarChart3, Radio, Wallet
+  ChevronLeft, ChevronRight, TrendingUp, FileText, PieChart, BarChart3, Radio, Wallet,
+  ClipboardList, Receipt, UserCircle
 } from 'lucide-react';
 import { 
   ResponsiveContainer, PieChart as RePieChart, Pie, Cell, 
@@ -18,9 +19,24 @@ interface DashboardProps {
   onViewTechnician: (id: string) => void;
   trackers?: Tracker[];
   reimbursements?: Reimbursement[];
+  onNavigateTab?: (tab: 'dashboard' | 'services' | 'reimbursements' | 'users' | 'profile' | 'trackers') => void;
+  isMobileSummaryDetail?: boolean;
+  onOpenMobileSummaryDetail?: () => void;
+  onCloseMobileSummaryDetail?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, viewingTechnicianId, trackers = [], reimbursements = [] }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  services, 
+  currentUser, 
+  users, 
+  viewingTechnicianId, 
+  trackers = [], 
+  reimbursements = [], 
+  onNavigateTab,
+  isMobileSummaryDetail = false,
+  onOpenMobileSummaryDetail,
+  onCloseMobileSummaryDetail
+}) => {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -171,9 +187,234 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-6 md:space-y-10 print:p-0">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
+      
+      {/* ======================================================== */}
+      {/* CENÁRIO 1: TELA INICIAL MOBILE (5 QUADRADOS + MÊS)       */}
+      {/* Mostrado SOMENTE no mobile quando NÃO está em Resumo      */}
+      {/* ======================================================== */}
+      {!isMobileSummaryDetail && (
+        <div className="md:hidden space-y-4 print:hidden">
+          
+          {/* Barra superior de identificação rápida */}
+          <div className="flex items-center justify-between px-1">
+            <div>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">
+                Início
+              </h1>
+              <p className="text-xs font-semibold text-slate-500">{technicianName}</p>
+            </div>
+            {isAdmin && (
+              <button 
+                onClick={handleExportPDF} 
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#0B0F17] border border-red-500/30 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm active:scale-95"
+              >
+                <FileText size={14} className="text-red-500" />
+                <span>PDF</span>
+              </button>
+            )}
+          </div>
+
+          {/* GRADE DE 5 QUADRADOS: 2 EM CIMA, 1 NO MEIO (RESUMO), 2 EM BAIXO */}
+          <div className="grid grid-cols-2 gap-3 w-full">
+            
+            {/* 1. TOPO ESQUERDA: SERVIÇOS */}
+            <button
+              type="button"
+              onClick={() => onNavigateTab && onNavigateTab('services')}
+              className="p-3.5 rounded-2xl bg-[#0B0F17] border border-slate-800 hover:border-cyan-500/50 text-left shadow-lg active:scale-95 transition-all flex flex-col justify-between h-28 relative overflow-hidden group cursor-pointer"
+            >
+              <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/10 rounded-bl-2xl flex items-center justify-center">
+                <span className="text-[10px] font-black text-cyan-400">{stats.total}</span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform">
+                <ClipboardList size={20} />
+              </div>
+              <div>
+                <span className="text-xs font-black text-white uppercase tracking-wider block">SERVIÇOS</span>
+                <span className="text-[9px] text-slate-400 font-medium">Controle de O.S.</span>
+              </div>
+            </button>
+
+            {/* 2. TOPO DIREITA: REEMBOLSOS */}
+            <button
+              type="button"
+              onClick={() => onNavigateTab && onNavigateTab('reimbursements')}
+              className="p-3.5 rounded-2xl bg-[#0B0F17] border border-slate-800 hover:border-amber-500/50 text-left shadow-lg active:scale-95 transition-all flex flex-col justify-between h-28 relative overflow-hidden group cursor-pointer"
+            >
+              <div className="absolute top-0 right-0 w-8 h-8 bg-amber-500/10 rounded-bl-2xl flex items-center justify-center">
+                <span className="text-[10px] font-black text-amber-400">R$</span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
+                <Receipt size={20} />
+              </div>
+              <div>
+                <span className="text-xs font-black text-white uppercase tracking-wider block">REEMBOLSOS</span>
+                <span className="text-[9px] text-slate-400 font-medium">Notas & Despesas</span>
+              </div>
+            </button>
+
+            {/* 3. CENTRO: RESUMO (AO CLICAR, ABRE A PÁGINA DE MÉTRICAS DO RESUMO) */}
+            <div className="col-span-2 flex justify-center">
+              <button
+                type="button"
+                onClick={() => onOpenMobileSummaryDetail && onOpenMobileSummaryDetail()}
+                className="w-full p-4 rounded-2xl bg-gradient-to-r from-[#121824] via-[#1E273A] to-[#121824] border-2 border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.22)] text-left active:scale-[0.98] transition-all flex items-center justify-between relative overflow-hidden group cursor-pointer"
+              >
+                <div className="flex items-center space-x-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-red-600 flex items-center justify-center text-white shadow-[0_0_14px_rgba(239,68,68,0.6)] group-hover:scale-105 transition-transform">
+                    <TrendingUp size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-black text-white uppercase tracking-wider">RESUMO</span>
+                      <span className="px-2 py-0.5 rounded-md bg-red-500/25 text-red-400 text-[9px] font-black uppercase tracking-wider">Ver Métricas</span>
+                    </div>
+                    <span className="text-[10px] text-slate-300 font-medium">Toque para ver indicadores</span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-xs font-black text-white block">R$ {stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Líquido</span>
+                </div>
+              </button>
+            </div>
+
+            {/* 4. BAIXO ESQUERDA: RASTREADOR */}
+            <button
+              type="button"
+              onClick={() => onNavigateTab && onNavigateTab('trackers')}
+              className="p-3.5 rounded-2xl bg-[#0B0F17] border border-slate-800 hover:border-purple-500/50 text-left shadow-lg active:scale-95 transition-all flex flex-col justify-between h-28 relative overflow-hidden group cursor-pointer"
+            >
+              <div className="absolute top-0 right-0 w-8 h-8 bg-purple-500/10 rounded-bl-2xl flex items-center justify-center">
+                <span className="text-[10px] font-black text-purple-400">{stats.availableTrackers}</span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 group-hover:scale-105 transition-transform">
+                <Radio size={20} />
+              </div>
+              <div>
+                <span className="text-xs font-black text-white uppercase tracking-wider block">RASTREADOR</span>
+                <span className="text-[9px] text-slate-400 font-medium">Estoque & Seriais</span>
+              </div>
+            </button>
+
+            {/* 5. BAIXO DIREITA: PERFIL */}
+            <button
+              type="button"
+              onClick={() => onNavigateTab && onNavigateTab('profile')}
+              className="p-3.5 rounded-2xl bg-[#0B0F17] border border-slate-800 hover:border-emerald-500/50 text-left shadow-lg active:scale-95 transition-all flex flex-col justify-between h-28 relative overflow-hidden group cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+                <UserCircle size={20} />
+              </div>
+              <div>
+                <span className="text-xs font-black text-white uppercase tracking-wider block">PERFIL</span>
+                <span className="text-[9px] text-slate-400 font-medium">Conta & Chave Pix</span>
+              </div>
+            </button>
+
+          </div>
+
+          {/* SELETOR DE MÊS COM DESIGN ESCURO METÁLICO (EXCLUSIVO VERSÃO MOBILE) */}
+          <div className="flex items-center justify-between space-x-3 bg-[#0B0F17] p-2.5 rounded-2xl border border-red-500/30 shadow-[0_4px_15px_rgba(0,0,0,0.5)]">
+            <button 
+              type="button"
+              onClick={handlePrevMonth} 
+              className="p-2 hover:bg-white/10 active:scale-90 rounded-xl transition-all text-red-500"
+              aria-label="Mês Anterior"
+            >
+              <ChevronLeft size={22} />
+            </button>
+            <div className="px-4 text-center min-w-[140px] font-black uppercase text-sm text-white tracking-wider">
+              {months[selectedMonth]} {selectedYear}
+            </div>
+            <button 
+              type="button"
+              onClick={handleNextMonth} 
+              className="p-2 hover:bg-white/10 active:scale-90 rounded-xl transition-all text-red-500"
+              aria-label="Próximo Mês"
+            >
+              <ChevronRight size={22} />
+            </button>
+          </div>
+
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* CENÁRIO 2: PÁGINA DEDICADA DE RESUMO (EXCLUSIVA MOBILE)   */}
+      {/* Mostrada SOMENTE no mobile quando isMobileSummaryDetail    */}
+      {/* Contém SOMENTE os 5 cards solicitados pelo usuário        */}
+      {/* ======================================================== */}
+      {isMobileSummaryDetail && (
+        <div className="md:hidden space-y-4 print:hidden">
+          
+          {/* Cabeçalho da Página de Resumo Mobile */}
+          <div className="flex items-center justify-between px-1">
+            <div>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">
+                Resumo
+              </h1>
+              <p className="text-xs font-semibold text-slate-500">{technicianName}</p>
+            </div>
+            {isAdmin && (
+              <button 
+                onClick={handleExportPDF} 
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#0B0F17] border border-red-500/30 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm active:scale-95"
+              >
+                <FileText size={14} className="text-red-500" />
+                <span>PDF</span>
+              </button>
+            )}
+          </div>
+
+          {/* Seletor de Mês Escuro Metálico */}
+          <div className="flex items-center justify-between space-x-3 bg-[#0B0F17] p-2.5 rounded-2xl border border-red-500/30 shadow-[0_4px_15px_rgba(0,0,0,0.5)]">
+            <button 
+              type="button"
+              onClick={handlePrevMonth} 
+              className="p-2 hover:bg-white/10 active:scale-90 rounded-xl transition-all text-red-500"
+              aria-label="Mês Anterior"
+            >
+              <ChevronLeft size={22} />
+            </button>
+            <div className="px-4 text-center min-w-[140px] font-black uppercase text-sm text-white tracking-wider">
+              {months[selectedMonth]} {selectedYear}
+            </div>
+            <button 
+              type="button"
+              onClick={handleNextMonth} 
+              className="p-2 hover:bg-white/10 active:scale-90 rounded-xl transition-all text-red-500"
+              aria-label="Próximo Mês"
+            >
+              <ChevronRight size={22} />
+            </button>
+          </div>
+
+          {/* SOMENTE OS 5 CARDS DE MÉTRICAS SOLICITADOS */}
+          <div className="grid grid-cols-1 gap-3.5 pt-1">
+            <StatCard title="Total de Serviços" value={stats.total} icon={Truck} color="bg-indigo-600" />
+            <StatCard title="Realizados" value={stats.realized} icon={CheckCircle2} color="bg-emerald-500" />
+            <StatCard 
+                title="Reembolso" 
+                value={stats.pendingReimbursementValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                prefix="R$ " 
+                icon={Wallet} 
+                color="bg-amber-500" 
+            />
+            <StatCard title="Cancelados" value={stats.cancelled} icon={XCircle} color="bg-rose-500" />
+            <StatCard title="Faturamento Líquido" value={stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} prefix="R$ " icon={DollarSign} color="bg-[#00AEEF]" />
+          </div>
+
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* CABEÇALHO ORIGINAL DESKTOP (PRESERVADO PARA TELAS GRANDES) */}
+      {/* ======================================================== */}
+      <div className="hidden md:flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
         <div className="flex items-center space-x-5">
-           <div className="hidden md:flex w-16 h-16 bg-[#0A192F] rounded-2xl items-center justify-center text-white shadow-2xl">
+           <div className="w-16 h-16 bg-[#0A192F] rounded-2xl items-center justify-center text-white shadow-2xl flex">
               <TrendingUp size={36} className="text-[#00AEEF]" />
            </div>
            <div>
@@ -191,7 +432,7 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
               <span>Exportar PDF</span>
             </button>
           )}
-          <div className="flex items-center justify-between space-x-3 bg-white p-2 rounded-2xl border border-slate-200">
+          <div className="flex items-center justify-between space-x-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
             <button 
               onClick={handlePrevMonth} 
               className="p-2 hover:bg-slate-100 rounded-xl transition-colors group"
@@ -209,7 +450,8 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-8">
+      {/* SEÇÃO DE MÉTRICAS E GRÁFICOS DO DESKTOP (ESCONDIDA NO MOBILE) */}
+      <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-8">
         <StatCard title="Total de Serviços" value={stats.total} icon={Truck} color="bg-indigo-600" />
         <StatCard title="Realizados" value={stats.realized} icon={CheckCircle2} color="bg-emerald-500" />
         
@@ -226,7 +468,7 @@ const Dashboard: React.FC<DashboardProps> = ({ services, currentUser, users, vie
         <StatCard title="Faturamento Líquido" value={stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} prefix="R$ " icon={DollarSign} color="bg-[#00AEEF]" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+      <div className="hidden md:grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm print:border-slate-300">
           <h4 className="text-lg font-black text-slate-800 uppercase mb-8 flex items-center"><PieChart className="mr-2 text-[#00AEEF]" size={20} /> Participação</h4>
           <div className="h-[250px] md:h-[300px] w-full">

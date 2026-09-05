@@ -15,7 +15,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser, onLogout, isOpen, onClose }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Resumo', icon: LayoutDashboard },
     { id: 'services', label: 'Serviços', icon: ClipboardList },
     { id: 'trackers', label: 'Rastreadores', icon: Radio },
     { id: 'reimbursements', label: 'Reembolsos', icon: Receipt },

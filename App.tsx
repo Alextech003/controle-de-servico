@@ -15,7 +15,7 @@ import ReimbursementIntro from './components/ReimbursementIntro';
 import NotificationsPanel from './components/NotificationsPanel';
 import { supabase, mapServiceFromDB, mapServiceToDB, mapUserFromDB, mapUserToDB, mapReimbursementFromDB, mapReimbursementToDB, mapTrackerFromDB, mapTrackerToDB, mapNotificationFromDB, mapNotificationToDB } from './lib/supabase';
 import { MOCK_USERS, MOCK_REIMBURSEMENTS, MOCK_TRACKERS, MOCK_SERVICES } from './constants';
-import { Loader2, Menu, Database, Bell } from 'lucide-react';
+import { Loader2, Menu, Database, Bell, ChevronLeft } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -32,6 +32,12 @@ const App: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isMobileSummaryDetail, setIsMobileSummaryDetail] = useState(false);
+
+  const handleGoHome = () => {
+    setActiveTab('dashboard');
+    setIsMobileSummaryDetail(false);
+  };
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -459,7 +465,22 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard services={dashboardServices} reimbursements={visibleReimbursements} currentUser={currentUser} users={users} viewingTechnicianId={viewingTechnicianId} onViewTechnician={(id) => { setViewingTechnicianId(id); setActiveTab('services'); }} trackers={trackers} />;
+        return <Dashboard 
+          services={dashboardServices} 
+          reimbursements={visibleReimbursements} 
+          currentUser={currentUser} 
+          users={users} 
+          viewingTechnicianId={viewingTechnicianId} 
+          onViewTechnician={(id) => { setViewingTechnicianId(id); setActiveTab('services'); setIsMobileSummaryDetail(false); }} 
+          trackers={trackers} 
+          onNavigateTab={(tab: any) => {
+            setActiveTab(tab);
+            setIsMobileSummaryDetail(false);
+          }}
+          isMobileSummaryDetail={isMobileSummaryDetail}
+          onOpenMobileSummaryDetail={() => setIsMobileSummaryDetail(true)}
+          onCloseMobileSummaryDetail={() => setIsMobileSummaryDetail(false)}
+        />;
       case 'services':
         return <Services services={visibleServices} currentUser={currentUser} users={users} onSaveService={handleSaveService} onDeleteService={handleDeleteService} viewingTechnicianId={viewingTechnicianId} onClearFilter={() => setViewingTechnicianId(null)} onFilterByTech={(id) => setViewingTechnicianId(id)} trackers={trackers} />;
       case 'trackers':
@@ -501,42 +522,76 @@ const App: React.FC = () => {
          onMarkAllAsRead={handleMarkAllAsRead}
       />
 
-      {/* HEADER MOBILE */}
-      <div className={`md:hidden fixed left-0 right-0 h-20 bg-white border-b border-slate-100 z-40 flex items-center justify-between px-6 shadow-sm ${isDemoMode ? 'top-14' : 'top-0'}`}>
-        <div className="flex items-center space-x-3">
-          <Logo size={32} />
-          <div className="flex flex-col">
-            <span className="text-lg font-black text-[#0A192F] uppercase tracking-tight leading-none">
-              AIRO<span className="text-red-600">TRACKER</span>
-            </span>
-            <div className="flex items-center">
-               <span className="text-red-600 text-[10px] font-black mr-0.5">+</span>
-               <span className="text-slate-800 text-[9px] font-black uppercase">Técnicos</span>
+      {/* HEADER MOBILE PRETO METÁLICO */}
+      <div className={`md:hidden fixed left-0 right-0 h-20 bg-gradient-to-r from-[#07090D] via-[#0F141E] to-[#07090D] border-b border-red-500/20 z-40 flex items-center justify-between px-3 sm:px-6 shadow-[0_4px_25px_rgba(0,0,0,0.6)] ${isDemoMode ? 'top-14' : 'top-0'}`}>
+        
+        {/* Linha de feixe vermelho sutil no rodapé do cabeçalho metálico */}
+        <div className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-red-500/40 to-transparent pointer-events-none"></div>
+
+        {/* LADO ESQUERDO: BOTÃO VOLTAR (SE FORA DA TELA INICIAL MOBILE) + CÁPSULA LOGO/NOME */}
+        <div className="flex items-center space-x-2 min-w-0">
+          {(activeTab !== 'dashboard' || isMobileSummaryDetail) && (
+            <button
+              type="button"
+              onClick={handleGoHome}
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(239,68,68,0.5)] border border-red-400/40 transition-all cursor-pointer shrink-0"
+              title="Voltar para o Início"
+              aria-label="Voltar para o Início"
+            >
+              <ChevronLeft size={18} className="stroke-[3]" />
+              <span className="text-[11px]">Início</span>
+            </button>
+          )}
+
+          {/* CÁPSULA COM COR CLARA PARA A LOGO E O NOME SOBRESSAÍREM (CLICÁVEL PARA INÍCIO) */}
+          <button 
+            type="button"
+            onClick={handleGoHome}
+            className="flex items-center space-x-2 bg-slate-50 border border-white/80 px-2.5 py-1.5 rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.35)] transition-transform active:scale-98 text-left cursor-pointer shrink-0"
+            title="Ir para o Início"
+          >
+            <Logo size={28} />
+            <div className="flex flex-col">
+              <span className="text-sm sm:text-base font-black text-[#0A192F] uppercase tracking-tight leading-none">
+                AIRO<span className="text-red-600">TRACKER</span>
+              </span>
+              <div className="flex items-center">
+                 <span className="text-red-600 text-[9px] font-black mr-0.5">+</span>
+                 <span className="text-slate-800 text-[8px] font-black uppercase">Técnicos</span>
+              </div>
             </div>
-          </div>
+          </button>
         </div>
-        <div className="flex items-center space-x-2">
+
+        {/* BOTÕES DO SINO E MENU EM BRANCO */}
+        <div className="flex items-center space-x-1 shrink-0">
             <button 
                onClick={() => setIsNotificationsOpen(true)}
-               className="p-2 text-slate-600 hover:bg-slate-50 rounded-xl relative"
+               className="p-2 text-white hover:text-red-400 hover:bg-white/10 active:scale-95 rounded-xl transition-all relative"
+               aria-label="Notificações"
             >
-               <Bell size={24} />
+               <Bell size={22} className="text-white drop-shadow-sm" />
                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full"></span>
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-[#0B0F17] rounded-full animate-pulse shadow-[0_0_8px_#EF4444]"></span>
                )}
             </button>
             <button 
               onClick={() => setIsMobileMenuOpen(true)} 
-              className="p-2 text-slate-600 hover:bg-slate-50 rounded-xl"
+              className="p-2 text-white hover:text-red-400 hover:bg-white/10 active:scale-95 rounded-xl transition-all"
+              aria-label="Abrir Menu"
             >
-              <Menu size={28} />
+              <Menu size={26} className="text-white drop-shadow-sm" />
             </button>
         </div>
       </div>
 
       <Sidebar 
         activeTab={activeTab} 
-        setActiveTab={(tab) => { setActiveTab(tab); setIsMobileMenuOpen(false); }} 
+        setActiveTab={(tab) => { 
+          setActiveTab(tab); 
+          setIsMobileMenuOpen(false); 
+          setIsMobileSummaryDetail(false);
+        }} 
         currentUser={currentUser}
         onLogout={handleLogout}
         isOpen={isMobileMenuOpen}
@@ -563,6 +618,19 @@ const App: React.FC = () => {
           </header>
 
           <main className={`flex-1 overflow-y-auto pt-20 md:pt-0 transition-all duration-300 relative`}>
+            {/* BOTÃO DE VOLTAR NO TOPO DO CONTEÚDO MOBILE */}
+            {(activeTab !== 'dashboard' || isMobileSummaryDetail) && (
+              <div className="md:hidden px-4 pt-3 pb-1">
+                <button
+                  type="button"
+                  onClick={handleGoHome}
+                  className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-[#0B0F17] border border-red-500/30 text-white shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <ChevronLeft size={18} className="text-red-500 stroke-[3]" />
+                  <span className="text-xs font-black uppercase tracking-wider">Voltar para a Tela Inicial</span>
+                </button>
+              </div>
+            )}
             {renderContent()}
           </main>
       </div>
