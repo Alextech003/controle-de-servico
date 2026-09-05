@@ -497,7 +497,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
+    <div className="flex h-screen overflow-hidden bg-[#07090D] text-slate-100 font-sans selection:bg-red-600 selection:text-white">
       
       {/* ALERTA DE MODO DEMO */}
       {isDemoMode && (
@@ -600,24 +600,65 @@ const App: React.FC = () => {
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
           
-          {/* HEADER DESKTOP (Agora inclui o botão de Notificação) */}
-          <header className={`hidden md:flex items-center justify-end px-8 py-4 bg-white/50 backdrop-blur-sm z-30 ${isDemoMode ? 'mt-14' : ''}`}>
-              <button 
-                 onClick={() => setIsNotificationsOpen(true)}
-                 className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-500 hover:text-[#00AEEF] hover:shadow-lg transition-all relative group"
-                 title="Notificações"
-              >
-                 <Bell size={20} className="group-hover:scale-110 transition-transform" />
-                 {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 border-2 border-white"></span>
-                    </span>
-                 )}
-              </button>
+          {/* HEADER DESKTOP ESTILO PRETO METÁLICO & COCKPIT TÁTICO */}
+          <header className={`hidden md:flex items-center justify-between px-8 py-3.5 bg-[#0B0F17]/95 border-b border-red-500/20 backdrop-blur-md z-30 relative ${isDemoMode ? 'mt-14' : ''}`}>
+              {/* Feixe sutil vermelho inferior */}
+              <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-red-500/40 to-transparent pointer-events-none"></div>
+
+              {/* Status do Cockpit no Desktop */}
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-[#121824] border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.15)]">
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-[10px] font-black text-slate-300 tracking-wider uppercase">SISTEMA ATIVO</span>
+                  <span className="text-red-500 font-black text-xs">•</span>
+                  <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">MONITORAMENTO 24H</span>
+                </div>
+              </div>
+
+              {/* Controles do Lado Direito */}
+              <div className="flex items-center space-x-4">
+                {/* Botão de Notificações */}
+                <button 
+                   type="button"
+                   onClick={() => setIsNotificationsOpen(true)}
+                   className="p-2.5 bg-[#121824] border border-red-500/30 rounded-xl text-slate-300 hover:text-white hover:border-red-500/60 hover:shadow-[0_0_12px_rgba(239,68,68,0.3)] active:scale-95 transition-all relative group cursor-pointer"
+                   title="Notificações"
+                >
+                   <Bell size={18} className="group-hover:scale-110 transition-transform" />
+                   {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-red-600 border border-[#0B0F17] shadow-[0_0_8px_#EF4444]"></span>
+                      </span>
+                   )}
+                </button>
+
+                {/* Identificação de Perfil no Header */}
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('profile')}
+                  className="flex items-center space-x-3 pl-4 border-l border-slate-800 text-left cursor-pointer group"
+                  title="Acessar meu perfil"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-[#1C2436] to-[#0D121B] border border-red-500/40 overflow-hidden flex items-center justify-center text-white font-black text-xs shadow-md group-hover:border-red-400 transition-colors">
+                    {currentUser.avatar ? (
+                      <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                    ) : (
+                      currentUser.name.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div className="hidden lg:block text-left">
+                    <p className="text-xs font-black text-white leading-tight group-hover:text-red-400 transition-colors">{currentUser.name}</p>
+                    <p className="text-[9px] text-red-400 font-bold uppercase tracking-wider">{currentUser.role}</p>
+                  </div>
+                </button>
+              </div>
           </header>
 
-          <main className={`flex-1 overflow-y-auto pt-20 md:pt-0 transition-all duration-300 relative`}>
+          <main className={`flex-1 overflow-y-auto pt-20 md:pt-0 transition-all duration-300 relative bg-[#07090D]`}>
             {/* BOTÃO DE VOLTAR NO TOPO DO CONTEÚDO MOBILE */}
             {(activeTab !== 'dashboard' || isMobileSummaryDetail) && (
               <div className="md:hidden px-4 pt-3 pb-1">
