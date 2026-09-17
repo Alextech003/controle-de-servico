@@ -34,7 +34,7 @@ export const mapServiceFromDB = (s: any): Service => ({
   technicianName: s.technician_name,
   cancellationReason: s.cancellation_reason,
   cancelledBy: s.cancelled_by as CancelledBy,
-  improductiveReason: s.improductive_reason,
+  improductiveReason: s.improductive_reason || (s.status === ServiceStatus.IMPRODUTIVO ? s.cancellation_reason : undefined),
   imei: s.imei,
   // Novos Campos Mapeados
   hasExchange: s.has_exchange,
@@ -56,9 +56,10 @@ export const mapServiceToDB = (s: Partial<Service>) => ({
   status: s.status,
   technician_id: s.technicianId,
   technician_name: s.technicianName,
-  cancellation_reason: s.cancellationReason,
-  cancelled_by: s.cancelledBy,
-  improductive_reason: s.improductiveReason,
+  cancellation_reason: s.status === ServiceStatus.IMPRODUTIVO
+    ? (s.improductiveReason || s.cancellationReason || null)
+    : (s.cancellationReason || null),
+  cancelled_by: s.cancelledBy || null,
   imei: s.imei,
   // Novos Campos
   has_exchange: s.hasExchange,
