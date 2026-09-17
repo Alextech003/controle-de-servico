@@ -81,7 +81,7 @@ const MonthlyReminder: React.FC<MonthlyReminderProps> = ({ currentUser }) => {
               </div>
               <div className="flex items-center space-x-3 text-slate-600">
                  <CheckCircle2 size={20} className="text-[#00AEEF]" />
-                 <span className="text-xs font-bold uppercase">Confirme os status (Realizado/Cancelado)</span>
+                 <span className="text-xs font-bold uppercase">Confirme os status (Realizado/Improdutivo/Cancelado)</span>
               </div>
            </div>
 

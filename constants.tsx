@@ -77,6 +77,21 @@ export const MOCK_SERVICES: Service[] = [
     technicianName: 'Lucas Silva',
     cancellationReason: 'Cliente não estava no local',
     cancelledBy: CancelledBy.TECNICO
+  },
+  {
+    id: 's5',
+    date: `${currentMonthStr}-09`,
+    customerName: 'ROBERTO CARLOS ALVES (IMPRODUTIVO)',
+    neighborhood: 'BANGU',
+    type: ServiceType.MANUTENCAO,
+    company: Company.AIROTRACKER,
+    vehicle: 'CHEVROLET ONIX',
+    plate: 'RIO2D45',
+    value: 40,
+    status: ServiceStatus.IMPRODUTIVO,
+    improductiveReason: 'Cliente ausente no endereço após 40min de espera e contato telefônico sem sucesso.',
+    technicianId: '3',
+    technicianName: 'José Técnico'
   }
 ];
 

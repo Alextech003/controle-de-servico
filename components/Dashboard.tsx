@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Truck, CheckCircle2, DollarSign, XCircle, 
   ChevronLeft, ChevronRight, TrendingUp, FileText, PieChart, BarChart3, Radio, Wallet,
-  ClipboardList, Receipt, UserCircle, Shield, Activity, Zap
+  ClipboardList, Receipt, UserCircle, Shield, Activity, Zap, AlertTriangle
 } from 'lucide-react';
 import { 
   ResponsiveContainer, PieChart as RePieChart, Pie, Cell, 
@@ -76,9 +76,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   const stats = useMemo(() => {
     const total = filteredServices.length;
     const realized = filteredServices.filter(s => s.status === ServiceStatus.REALIZADO).length;
+    const improductive = filteredServices.filter(s => s.status === ServiceStatus.IMPRODUTIVO).length;
     const cancelled = filteredServices.filter(s => s.status === ServiceStatus.CANCELADO).length;
     const grossRevenue = filteredServices
-      .filter(s => s.status === ServiceStatus.REALIZADO)
+      .filter(s => s.status === ServiceStatus.REALIZADO || s.status === ServiceStatus.IMPRODUTIVO)
       .reduce((acc, s) => acc + s.value, 0);
     
     // Regra: se cancelado pelo técnico, desconta 50 reais
@@ -125,7 +126,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         return acc + val;
       }, 0);
 
-    return { total, realized, cancelled, revenue: grossRevenue - techPenalties, availableTrackers, byCompany, pendingReimbursementValue };
+    return { total, realized, improductive, cancelled, revenue: grossRevenue - techPenalties, availableTrackers, byCompany, pendingReimbursementValue };
   }, [filteredServices, trackers, currentUser, viewingTechnicianId, reimbursements, selectedMonth, selectedYear]);
 
   const COLORS = {

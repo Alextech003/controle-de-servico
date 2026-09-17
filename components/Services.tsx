@@ -6,7 +6,8 @@ import {
   ArrowRight, CopyPlus, Loader2,
   Users as UsersIcon, Check, XCircle, ChevronLeft, ChevronRight,
   MapPin, CalendarDays, Car, Barcode, Box, DollarSign,
-  ScanBarcode, Cpu, RefreshCw, LogOut as LogOutIcon, ArrowDown
+  ScanBarcode, Cpu, RefreshCw, LogOut as LogOutIcon, ArrowDown,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   Service, ServiceStatus, ServiceType, Company, 
@@ -45,6 +46,7 @@ const Services: React.FC<ServicesProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [viewingReason, setViewingReason] = useState<Service | null>(null);
+  const [viewingImproductiveReason, setViewingImproductiveReason] = useState<Service | null>(null);
   
   // Alterado: Agora armazena o SERVIÇO inteiro para ver Instalado E Retirado
   const [viewingServiceEquipment, setViewingServiceEquipment] = useState<Service | null>(null);
@@ -56,13 +58,31 @@ const Services: React.FC<ServicesProps> = ({
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'realized' | 'cancelled'>('realized');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'realized' | 'improductive' | 'cancelled'>('realized');
   const [isSaving, setIsSaving] = useState(false);
   
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+  // Estatísticas do mês para os botões de filtro e destaque da conferente
+  const monthlyStats = useMemo(() => {
+    const monthServices = services.filter(s => {
+      const sDate = new Date(s.date + 'T12:00:00');
+      return sDate.getMonth() === selectedMonth && sDate.getFullYear() === selectedYear;
+    });
+    const realized = monthServices.filter(s => s.status === ServiceStatus.REALIZADO).length;
+    const improductive = monthServices.filter(s => s.status === ServiceStatus.IMPRODUTIVO).length;
+    const cancelled = monthServices.filter(s => s.status === ServiceStatus.CANCELADO).length;
+    return {
+      total: monthServices.length,
+      realized,
+      improductive,
+      realizedWithImproductive: realized + improductive,
+      cancelled
+    };
+  }, [services, selectedMonth, selectedYear]);
 
   // Funções de navegação do mês
   const handlePrevMonth = () => {
@@ -99,6 +119,7 @@ const Services: React.FC<ServicesProps> = ({
     plate: '',
     cancellationReason: '',
     cancelledBy: undefined,
+    improductiveReason: '',
     imei: '',
     hasExchange: false,
     removedImei: '',
@@ -151,7 +172,8 @@ const Services: React.FC<ServicesProps> = ({
                             s.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             s.neighborhood.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter = activeFilter === 'all' || 
-                            (activeFilter === 'realized' && s.status === ServiceStatus.REALIZADO) || 
+                            (activeFilter === 'realized' && (s.status === ServiceStatus.REALIZADO || s.status === ServiceStatus.IMPRODUTIVO)) || 
+                            (activeFilter === 'improductive' && s.status === ServiceStatus.IMPRODUTIVO) ||
                             (activeFilter === 'cancelled' && s.status === ServiceStatus.CANCELADO);
       return matchesMonth && matchesSearch && matchesFilter;
     });
@@ -191,10 +213,15 @@ const Services: React.FC<ServicesProps> = ({
   };
 
   const handleExportExcel = () => {
-    const headers = "Data;Cliente;Bairro;Tipo;Empresa;Veículo;Placa;Valor;Status;IMEI;Técnico\n";
-    const csv = filteredServices.map(s => 
-      `${s.date};${s.customerName};${s.neighborhood};${s.type};${s.company};${s.vehicle};${s.plate};${s.value.toFixed(2)};${s.status};${s.imei || ''};${s.technicianName}`
-    ).join("\n");
+    const headers = "Data;Cliente;Bairro;Tipo;Empresa;Veículo;Placa;Valor;Status;Motivo Improdutivo / Cancelamento;IMEI;Técnico\n";
+    const csv = filteredServices.map(s => {
+      const reason = s.status === ServiceStatus.IMPRODUTIVO 
+        ? (s.improductiveReason || '') 
+        : s.status === ServiceStatus.CANCELADO 
+        ? `${s.cancellationReason || ''} (${s.cancelledBy || ''})` 
+        : '';
+      return `${s.date};${s.customerName};${s.neighborhood};${s.type};${s.company};${s.vehicle};${s.plate};${s.value.toFixed(2)};${s.status};${reason.replace(/;/g, ',')};${s.imei || ''};${s.technicianName}`;
+    }).join("\n");
     const blob = new Blob(["\ufeff" + headers + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -205,6 +232,11 @@ const Services: React.FC<ServicesProps> = ({
   const handleSave = async (keepOpen: boolean = false) => {
     if (!formData.customerName || !formData.date || !formData.plate) {
       alert("Por favor, preencha o Nome do Cliente, Data e Placa."); 
+      return;
+    }
+
+    if (formData.status === ServiceStatus.IMPRODUTIVO && !formData.improductiveReason?.trim()) {
+      alert("Por favor, informe o motivo pelo qual o serviço ficou improdutivo.");
       return;
     }
 
@@ -227,6 +259,7 @@ const Services: React.FC<ServicesProps> = ({
         vehicle: '', 
         plate: '',
         imei: '',
+        improductiveReason: '',
         hasExchange: false,
         removedImei: '',
         removedModel: ''
@@ -322,13 +355,88 @@ const Services: React.FC<ServicesProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:hidden">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-            <input type="text" placeholder="Buscar..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 shadow-sm text-xs" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input type="text" placeholder="Buscar por cliente, placa ou bairro..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 shadow-sm text-xs" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
-          <div className="flex p-1 bg-white border border-slate-200 rounded-2xl space-x-1">
-              <button onClick={() => setActiveFilter('realized')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeFilter === 'realized' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400'}`}>Realizados</button>
-              <button onClick={() => setActiveFilter('cancelled')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeFilter === 'cancelled' ? 'bg-rose-500 text-white shadow-lg' : 'text-slate-400'}`}>Cancelados</button>
+          <div className="flex p-1 bg-white border border-slate-200 rounded-2xl space-x-1 shadow-sm">
+              <button 
+                onClick={() => setActiveFilter('realized')} 
+                className={`flex-1 py-2 px-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 ${
+                  activeFilter === 'realized' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>Realizados</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                  activeFilter === 'realized' ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {monthlyStats.realizedWithImproductive}
+                </span>
+              </button>
+
+              <button 
+                onClick={() => setActiveFilter('improductive')} 
+                className={`flex-1 py-2 px-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 ${
+                  activeFilter === 'improductive' ? 'bg-amber-500 text-slate-950 font-black shadow-md ring-2 ring-amber-400' : 'text-amber-800 bg-amber-50/50 hover:bg-amber-100'
+                }`}
+                title="Filtrar apenas serviços improdutivos para conferência"
+              >
+                <AlertTriangle size={12} className={activeFilter === 'improductive' ? 'text-slate-950' : 'text-amber-600'} />
+                <span>Improdutivos</span>
+                {monthlyStats.improductive > 0 && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                    activeFilter === 'improductive' ? 'bg-slate-950 text-amber-400' : 'bg-amber-200 text-amber-900'
+                  }`}>
+                    {monthlyStats.improductive}
+                  </span>
+                )}
+              </button>
+
+              <button 
+                onClick={() => setActiveFilter('cancelled')} 
+                className={`flex-1 py-2 px-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 ${
+                  activeFilter === 'cancelled' ? 'bg-rose-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>Cancelados</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                  activeFilter === 'cancelled' ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {monthlyStats.cancelled}
+                </span>
+              </button>
           </div>
         </div>
+
+        {/* Banner de Destaque da Conferente para Serviços Improdutivos */}
+        {monthlyStats.improductive > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 px-4 bg-amber-50 border-2 border-amber-300/80 rounded-2xl text-amber-900 shadow-sm print:hidden animate-in fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-sm flex-shrink-0">
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-amber-950 flex items-center gap-2">
+                  <span>Atenção Conferente</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black">
+                    {monthlyStats.improductive} serviço{monthlyStats.improductive > 1 ? 's' : ''} improdutivo{monthlyStats.improductive > 1 ? 's' : ''} no mês
+                  </span>
+                </p>
+                <p className="text-[11px] text-amber-800 font-semibold">
+                  Identificados com fundo e tarja amarela na tabela abaixo para validação e pagamento do técnico.
+                </p>
+              </div>
+            </div>
+            {activeFilter !== 'improductive' && (
+              <button
+                type="button"
+                onClick={() => setActiveFilter('improductive')}
+                className="self-start sm:self-auto px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm flex items-center space-x-1 cursor-pointer whitespace-nowrap"
+              >
+                <AlertTriangle size={12} />
+                <span>Ver Apenas Improdutivos</span>
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden print:border-slate-300">
           <div className="overflow-x-auto">
@@ -336,6 +444,7 @@ const Services: React.FC<ServicesProps> = ({
               <thead className="bg-slate-50/80 text-[9px] font-black uppercase text-slate-400 border-b border-slate-100">
                 <tr>
                   <th className="px-3 py-3 whitespace-nowrap">Data</th>
+                  <th className="px-3 py-3 text-center whitespace-nowrap">Status</th>
                   <th className="px-3 py-3 whitespace-nowrap">Cliente</th>
                   <th className="px-3 py-3 whitespace-nowrap">Bairro</th>
                   <th className="px-2 py-3 text-center whitespace-nowrap">Tipo</th>
@@ -349,14 +458,14 @@ const Services: React.FC<ServicesProps> = ({
               <tbody className="divide-y divide-slate-50">
                 {Object.keys(groupedServices).length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-10 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">Nenhum registro encontrado</td>
+                    <td colSpan={10} className="px-6 py-10 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">Nenhum registro encontrado</td>
                   </tr>
                 ) : (
                   Object.keys(groupedServices).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()).map(date => (
                     <React.Fragment key={date}>
                         {/* Linha Divisória de Data */}
                         <tr className="bg-slate-50/50">
-                            <td colSpan={9} className="px-3 py-2">
+                            <td colSpan={10} className="px-3 py-2">
                                 <div className="flex items-center w-full">
                                     <div className="h-px bg-blue-200 flex-1"></div>
                                     <div className="px-3 py-1 bg-white border border-blue-100 rounded-full flex items-center space-x-2 shadow-sm mx-4">
@@ -371,10 +480,58 @@ const Services: React.FC<ServicesProps> = ({
                         </tr>
 
                         {/* Serviços do Dia */}
-                        {groupedServices[date].map((s) => (
-                            <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
+                        {groupedServices[date].map((s) => {
+                          const isImproductive = s.status === ServiceStatus.IMPRODUTIVO;
+                          const isCancelled = s.status === ServiceStatus.CANCELADO;
+
+                          return (
+                            <tr 
+                              key={s.id} 
+                              className={`transition-colors group border-l-4 ${
+                                isImproductive 
+                                  ? 'bg-amber-50/90 hover:bg-amber-100/90 border-l-amber-500 shadow-[inset_0_1px_0_rgba(245,158,11,0.2)]' 
+                                  : isCancelled 
+                                  ? 'bg-rose-50/40 hover:bg-rose-50/80 border-l-rose-400 opacity-80' 
+                                  : 'hover:bg-slate-50/80 border-l-transparent'
+                              }`}
+                            >
                                 <td className="px-3 py-2 text-[10px] font-bold text-slate-400 whitespace-nowrap">{new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
-                                <td className="px-3 py-2 font-black text-slate-800 text-[10px] uppercase max-w-[140px] truncate" title={s.customerName}>{s.customerName}</td>
+                                
+                                {/* Coluna de Status com Super Destaque para Improdutivo */}
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
+                                  {isImproductive ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-black uppercase bg-amber-500 text-slate-950 border border-amber-600 shadow-sm animate-pulse tracking-wider">
+                                      <AlertTriangle size={11} className="text-slate-950 flex-shrink-0" />
+                                      IMPRODUTIVO
+                                    </span>
+                                  ) : isCancelled ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-rose-100 text-rose-700 border border-rose-200">
+                                      CANCELADO
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                      REALIZADO
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="px-3 py-2 text-[10px] uppercase max-w-[150px]" title={s.customerName}>
+                                  <p className="font-black text-slate-800 truncate">{s.customerName}</p>
+                                  {isImproductive && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingImproductiveReason(s)}
+                                      className="inline-flex items-center gap-1 text-[8px] font-black text-amber-900 uppercase bg-amber-200/90 hover:bg-amber-300 px-1.5 py-0.5 rounded mt-0.5 border border-amber-400 transition-colors cursor-pointer text-left"
+                                      title="Clique para ver o motivo pelo qual ficou improdutivo"
+                                    >
+                                      <span>⚠️</span>
+                                      <span className="truncate max-w-[120px]">
+                                        {s.improductiveReason ? `Motivo: ${s.improductiveReason}` : 'Improdutivo • Recebível'}
+                                      </span>
+                                    </button>
+                                  )}
+                                </td>
+
                                 <td className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase max-w-[100px] truncate" title={s.neighborhood}>
                                     <div className="flex items-center">
                                         <MapPin size={10} className="text-slate-300 mr-1" />
@@ -402,12 +559,47 @@ const Services: React.FC<ServicesProps> = ({
                                         {s.plate}
                                     </span>
                                 </td>
-                                <td className="px-3 py-2 text-[10px] font-black text-slate-900 whitespace-nowrap text-right">
-                                    {s.value === 0 ? '' : `R$${s.value.toFixed(2)}`}
+
+                                <td className="px-3 py-2 whitespace-nowrap text-right">
+                                    {isImproductive ? (
+                                      <div>
+                                        <span className="inline-block px-2 py-0.5 rounded bg-amber-200/90 border border-amber-400 text-[11px] font-black text-amber-950 shadow-xs">
+                                          R$ {s.value.toFixed(2)}
+                                        </span>
+                                        <span className="block text-[8px] font-bold text-amber-700 uppercase tracking-tighter mt-0.5">
+                                          Improdutivo
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] font-black text-slate-900">
+                                        {s.value === 0 ? '' : `R$${s.value.toFixed(2)}`}
+                                      </span>
+                                    )}
                                 </td>
+
                                 <td className="px-3 py-2 print:hidden whitespace-nowrap">
                                     <div className="flex items-center justify-center space-x-1">
-                                    {s.status === ServiceStatus.CANCELADO && <button onClick={() => setViewingReason(s)} className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"><MessageSquare size={14} /></button>}
+                                    {s.status === ServiceStatus.CANCELADO && (
+                                      <button 
+                                        type="button"
+                                        onClick={() => setViewingReason(s)} 
+                                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                        title="Ver motivo do cancelamento"
+                                      >
+                                        <MessageSquare size={14} />
+                                      </button>
+                                    )}
+
+                                    {s.status === ServiceStatus.IMPRODUTIVO && (
+                                      <button 
+                                        type="button"
+                                        onClick={() => setViewingImproductiveReason(s)} 
+                                        className="p-1.5 text-amber-600 bg-amber-100/60 hover:bg-amber-100 rounded-lg transition-all ring-1 ring-amber-300"
+                                        title="Ver motivo do serviço improdutivo"
+                                      >
+                                        <AlertTriangle size={14} />
+                                      </button>
+                                    )}
                                     
                                     {/* Botão de Ver Equipamento (Instalação, Troca ou Retirada) */}
                                     {(s.imei || s.removedImei) && (
@@ -446,7 +638,8 @@ const Services: React.FC<ServicesProps> = ({
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                          );
+                        })}
                     </React.Fragment>
                   ))
                 )}
@@ -512,10 +705,34 @@ const Services: React.FC<ServicesProps> = ({
                 </div>
                 <div className="md:col-span-3">
                   <label className="block text-xs font-black text-slate-500 uppercase mb-3 ml-1">Status Final *</label>
-                  <select className={`w-full px-5 py-4 border-2 rounded-2xl outline-none font-black ${formData.status === ServiceStatus.REALIZADO ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`} value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value as ServiceStatus})}>
-                    <option value={ServiceStatus.REALIZADO}>REALIZADO</option>
-                    <option value={ServiceStatus.CANCELADO}>CANCELADO</option>
+                  <select 
+                    className={`w-full px-5 py-4 border-2 rounded-2xl outline-none font-black text-sm transition-all ${
+                      formData.status === ServiceStatus.REALIZADO 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                        : formData.status === ServiceStatus.IMPRODUTIVO 
+                        ? 'bg-amber-50 border-amber-300 text-amber-900 ring-2 ring-amber-400/50' 
+                        : 'bg-rose-50 border-rose-200 text-rose-800'
+                    }`} 
+                    value={formData.status} 
+                    onChange={(e) => setFormData({...formData, status: e.target.value as ServiceStatus})}
+                  >
+                    <option value={ServiceStatus.REALIZADO}>✅ REALIZADO</option>
+                    <option value={ServiceStatus.IMPRODUTIVO}>⚠️ IMPRODUTIVO (RECEBÍVEL PELO TÉCNICO)</option>
+                    <option value={ServiceStatus.CANCELADO}>❌ CANCELADO</option>
                   </select>
+
+                  {formData.status === ServiceStatus.IMPRODUTIVO && (
+                    <div className="mt-3 p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl flex items-start space-x-3 text-amber-900 animate-in fade-in slide-in-from-top-2">
+                      <AlertTriangle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <p className="font-black uppercase tracking-wide text-amber-950">Serviço Improdutivo • Remuneração do Técnico</p>
+                        <p className="font-medium text-amber-800 mt-1 leading-relaxed">
+                          O técnico receberá o valor preenchido no campo <strong>"Valor do Serviço R$"</strong>. 
+                          Esse serviço constará na listagem com <strong>tarja amarela em destaque</strong> para que a conferente identifique e valide o pagamento imediatamente.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* --- LÓGICA DE INSTALAÇÃO (IMEI) --- */}
@@ -644,7 +861,7 @@ const Services: React.FC<ServicesProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 md:p-8 bg-rose-50 rounded-[2rem] border border-rose-100 animate-in slide-in-from-top-4">
                   <div>
                     <label className="block text-xs font-black text-rose-700 uppercase mb-3 ml-1">Motivo do Cancelamento *</label>
-                    <input type="text" className="w-full px-5 py-4 bg-white border-2 border-rose-200 rounded-2xl outline-none focus:border-rose-500 text-rose-900 font-bold" value={formData.cancellationReason || ''} onChange={(e) => setFormData({...formData, cancellationReason: e.target.value})} />
+                    <input type="text" className="w-full px-5 py-4 bg-white border-2 border-rose-200 rounded-2xl outline-none focus:border-rose-500 text-rose-900 font-bold" value={formData.cancellationReason || ''} onChange={(e) => setFormData({...formData, cancellationReason: e.target.value})} placeholder="Ex: Cliente cancelou na chegada..." />
                   </div>
                   <div>
                     <label className="block text-xs font-black text-rose-700 uppercase mb-3 ml-1">Cancelado Por *</label>
@@ -652,6 +869,55 @@ const Services: React.FC<ServicesProps> = ({
                       <option value="">Selecione...</option>
                       {Object.values(CancelledBy).map(cb => <option key={cb} value={cb}>{cb}</option>)}
                     </select>
+                  </div>
+                </div>
+              )}
+
+              {formData.status === ServiceStatus.IMPRODUTIVO && (
+                <div className="p-6 md:p-8 bg-amber-50 rounded-[2rem] border-2 border-amber-300 animate-in slide-in-from-top-4 space-y-4">
+                  <div className="flex items-center space-x-3 text-amber-900">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black flex-shrink-0 shadow-sm">
+                      <AlertTriangle size={18} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-wide text-amber-950">Por que o serviço ficou improdutivo? *</h4>
+                      <p className="text-[11px] text-amber-800 font-semibold">
+                        Descreva o ocorrido em detalhes para justificar o deslocamento e validar a remuneração com a conferente.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <textarea 
+                      className="w-full px-5 py-4 bg-white border-2 border-amber-200 rounded-2xl outline-none focus:border-amber-500 text-amber-950 font-bold text-sm min-h-[90px] shadow-inner placeholder:text-amber-400/80" 
+                      value={formData.improductiveReason || ''} 
+                      onChange={(e) => setFormData({...formData, improductiveReason: e.target.value})}
+                      placeholder="Ex: Cliente ausente no endereço agendado, aguardado por 40 min e tentativas de contato por ligação sem retorno..."
+                    />
+                  </div>
+
+                  {/* Sugestões rápidas de motivos */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <span className="text-[10px] font-black uppercase text-amber-800 self-center mr-1">Sugestões rápidas:</span>
+                    {[
+                      'Cliente ausente no local',
+                      'Veículo não estava disponível',
+                      'Endereço incorreto / Inacessível',
+                      'Cliente não autorizou o serviço no momento',
+                      'Problema elétrico / mecânico do veículo'
+                    ].map((reasonText) => (
+                      <button
+                        key={reasonText}
+                        type="button"
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          improductiveReason: prev.improductiveReason ? `${prev.improductiveReason}; ${reasonText}` : reasonText
+                        }))}
+                        className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[10px] font-bold transition-colors cursor-pointer"
+                      >
+                        + {reasonText}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
@@ -688,6 +954,60 @@ const Services: React.FC<ServicesProps> = ({
                     <p className="text-xs text-slate-400 font-bold uppercase mt-4">Cancelado por: <span className="text-slate-600">{viewingReason.cancelledBy}</span></p>
                  </div>
                  <button onClick={() => setViewingReason(null)} className="w-full py-4 bg-slate-100 text-slate-600 font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-200 transition-colors">
+                    Fechar
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Modal de Detalhes do Serviço Improdutivo */}
+      {viewingImproductiveReason && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0A192F]/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-300">
+              <div className="p-8 space-y-6">
+                 <div className="text-center">
+                    <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                       <AlertTriangle size={32} />
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider inline-block">
+                       Serviço Improdutivo
+                    </span>
+                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mt-2">
+                       Por que ficou improdutivo?
+                    </h3>
+                 </div>
+
+                 <div className="bg-amber-50/80 p-5 rounded-2xl border-2 border-amber-200 text-left space-y-2">
+                    <p className="text-xs font-black text-amber-900 uppercase tracking-wider">Motivo Informado:</p>
+                    <p className="text-slate-800 font-bold text-sm leading-relaxed whitespace-pre-wrap">
+                       {viewingImproductiveReason.improductiveReason || 'Nenhum motivo detalhado foi registrado.'}
+                    </p>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                       <span className="block text-[9px] font-black text-slate-400 uppercase">Cliente</span>
+                       <span className="font-black text-slate-800 uppercase truncate block">{viewingImproductiveReason.customerName}</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                       <span className="block text-[9px] font-black text-slate-400 uppercase">Valor a Receber</span>
+                       <span className="font-black text-amber-900 block">R$ {viewingImproductiveReason.value.toFixed(2)}</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                       <span className="block text-[9px] font-black text-slate-400 uppercase">Veículo / Placa</span>
+                       <span className="font-black text-slate-800 uppercase block">{viewingImproductiveReason.plate}</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                       <span className="block text-[9px] font-black text-slate-400 uppercase">Técnico</span>
+                       <span className="font-black text-slate-800 uppercase block truncate">{viewingImproductiveReason.technicianName}</span>
+                    </div>
+                 </div>
+
+                 <button 
+                    onClick={() => setViewingImproductiveReason(null)} 
+                    className="w-full py-4 bg-slate-900 text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-800 transition-colors shadow-lg cursor-pointer"
+                 >
                     Fechar
                  </button>
               </div>

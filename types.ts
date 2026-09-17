@@ -7,6 +7,7 @@ export enum UserRole {
 
 export enum ServiceStatus {
   REALIZADO = 'REALIZADO',
+  IMPRODUTIVO = 'IMPRODUTIVO',
   CANCELADO = 'CANCELADO'
 }
 
@@ -80,6 +81,7 @@ export interface Service {
   technicianName: string;
   cancellationReason?: string;
   cancelledBy?: CancelledBy;
+  improductiveReason?: string;
   imei?: string; // Equipamento instalado (novo)
   
   // Novos campos para controle de retirada
